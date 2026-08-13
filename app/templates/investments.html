@@ -122,10 +122,10 @@
             <thead>
                 <tr>
                     <th>Ticker / Security</th>
-                    <th>Asset Type</th>
-                    <th>Account</th>
-                    <th style="text-align: right;">Shares</th>
-                    <th style="text-align: right;">Current Price</th>
+                    <th class="hide-mobile">Asset Type</th>
+                    <th class="hide-mobile">Account</th>
+                    <th style="text-align: right;" class="hide-mobile">Shares</th>
+                    <th style="text-align: right;" class="hide-mobile">Price</th>
                     <th style="text-align: right;">Market Value</th>
                     <th style="text-align: right;">Today %</th>
                     <th style="text-align: right;">Total Gain/Loss</th>
@@ -135,19 +135,20 @@
                 {% for h in report.holdings %}
                 <tr>
                     <td>
-                        <div><strong>{{ h.ticker }}</strong> <span class="subtext">({{ h.name }})</span></div>
+                        <div><strong>{{ h.ticker }}</strong></div>
+                        <div class="subtext hide-mobile">({{ h.name }})</div>
                     </td>
-                    <td><span class="badge badge-transfer">{{ h.asset_type }}</span></td>
-                    <td class="subtext">{{ h.account_name }}</td>
-                    <td class="num" style="text-align: right;">{{ h.shares }}</td>
-                    <td class="num" style="text-align: right;">{{ h.formatted_price }}</td>
-                    <td class="num" style="text-align: right; font-weight: 600;">{{ h.formatted_market_value }}</td>
-                    <td class="num" style="text-align: right;">
+                    <td class="hide-mobile"><span class="badge badge-transfer">{{ h.asset_type }}</span></td>
+                    <td class="subtext hide-mobile">{{ h.account_name }}</td>
+                    <td class="num hide-mobile" style="text-align: right;">{{ h.shares }}</td>
+                    <td class="num hide-mobile" style="text-align: right;">{{ h.formatted_price }}</td>
+                    <td class="num" style="text-align: right; font-weight: 600; white-space: nowrap;">{{ h.formatted_market_value }}</td>
+                    <td class="num" style="text-align: right; white-space: nowrap;">
                         <span class="badge {% if h.day_change_pct >= 0 %}badge-income{% else %}badge-expense{% endif %}">
                             {% if h.day_change_pct >= 0 %}+{% endif %}{{ h.day_change_pct }}%
                         </span>
                     </td>
-                    <td class="num {% if h.gain_loss_cents >= 0 %}income{% else %}expense{% endif %}" style="text-align: right; font-weight: 600;">
+                    <td class="num {% if h.gain_loss_cents >= 0 %}income{% else %}expense{% endif %}" style="text-align: right; font-weight: 600; white-space: nowrap;">
                         {{ h.formatted_gain_loss }} ({{ h.gain_loss_pct }}%)
                     </td>
                 </tr>
@@ -170,7 +171,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Activity / Description</th>
-                    <th>Account</th>
+                    <th class="hide-mobile">Account</th>
                     <th>Category</th>
                     <th style="text-align: right;">Amount</th>
                 </tr>
@@ -178,18 +179,18 @@
             <tbody>
                 {% for tx in report.transactions %}
                 <tr>
-                    <td class="num" style="color: var(--text-secondary);">{{ tx.posted_at }}</td>
+                    <td class="num" style="color: var(--text-secondary); white-space: nowrap;">{{ tx.posted_at }}</td>
                     <td>
                         <div><strong>{{ tx.payee or tx.description }}</strong></div>
-                        <div class="subtext">{{ tx.description }}</div>
+                        <div class="subtext hide-mobile">{{ tx.description }}</div>
                     </td>
-                    <td class="subtext">{{ tx.account_name }}</td>
+                    <td class="subtext hide-mobile">{{ tx.account_name }}</td>
                     <td>
                         <a href="/transactions?category_id={{ tx.category_id }}" class="badge" style="background-color: rgba(56, 189, 248, 0.15); color: var(--accent-color); text-decoration: none;">
                             {{ tx.category_name or 'Investment' }}
                         </a>
                     </td>
-                    <td class="num" style="text-align: right; font-weight: 600; color: {% if tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
+                    <td class="num" style="text-align: right; font-weight: 600; white-space: nowrap; color: {% if tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
                         {{ tx.formatted_amount }}
                     </td>
                 </tr>
@@ -211,6 +212,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const allocData = [{% for item in report.asset_allocation %}{{ (item.value_cents / 100) | round(2) }}{% if not loop.last %},{% endif %}{% endfor %}];
     const allocColors = [{% for item in report.asset_allocation %}"{{ item.color }}"{% if not loop.last %},{% endif %}{% endfor %}];
 
+    const isMobile = window.innerWidth < 768;
+
     new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -227,7 +230,7 @@ document.addEventListener("DOMContentLoaded", function() {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'right',
+                    position: isMobile ? 'bottom' : 'right',
                     labels: { color: '#94A3B8', font: { size: 12 } }
                 },
                 tooltip: {

@@ -2,14 +2,80 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>{% block title %}Financial Dashboard{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <!-- Mobile Navigation Top Header -->
+    <header class="mobile-header">
+        <div class="mobile-brand">
+            <div class="brand-logo" title="MYREDGE">
+                <span class="brand-logo-text">ME</span>
+            </div>
+            <div class="brand-title">MYR<span>EDGE</span></div>
+        </div>
+        <button id="mobileMenuToggle" class="mobile-hamburger-btn" aria-label="Toggle navigation menu" aria-expanded="false">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+    </header>
+
+    <!-- Mobile Navigation Overlay & Drawer Menu -->
+    <div id="mobileNavOverlay" class="mobile-nav-overlay"></div>
+    <div id="mobileNavDrawer" class="mobile-nav-drawer" aria-hidden="true">
+        <div class="mobile-drawer-header">
+            <div class="mobile-brand">
+                <div class="brand-logo" title="MYREDGE">
+                    <span class="brand-logo-text">ME</span>
+                </div>
+                <div class="brand-title">MYR<span>EDGE</span></div>
+            </div>
+            <button id="mobileDrawerClose" class="mobile-drawer-close-btn" aria-label="Close navigation menu">✕</button>
+        </div>
+        <ul class="nav-list mobile-drawer-nav">
+            <li>
+                <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+                    <span class="nav-icon">📊</span> <span class="nav-text">Dashboard</span>
+                </a>
+            </li>
+            <li>
+                <a href="/reports/weekly" class="nav-link {% if active_page == 'weekly' %}active{% endif %}">
+                    <span class="nav-icon">📅</span> <span class="nav-text">Weekly Report</span>
+                </a>
+            </li>
+            <li>
+                <a href="/reports/monthly" class="nav-link {% if active_page == 'monthly' %}active{% endif %}">
+                    <span class="nav-icon">📆</span> <span class="nav-text">Monthly Report</span>
+                </a>
+            </li>
+            <li>
+                <a href="/reports/yearly" class="nav-link {% if active_page == 'yearly' %}active{% endif %}">
+                    <span class="nav-icon">📈</span> <span class="nav-text">Yearly Report</span>
+                </a>
+            </li>
+            <li>
+                <a href="/transactions" class="nav-link {% if active_page == 'transactions' %}active{% endif %}">
+                    <span class="nav-icon">💳</span> <span class="nav-text">Transactions</span>
+                </a>
+            </li>
+            <li>
+                <a href="/investments" class="nav-link {% if active_page == 'investments' %}active{% endif %}">
+                    <span class="nav-icon">📈</span> <span class="nav-text">Investments</span>
+                </a>
+            </li>
+            <li>
+                <a href="/subscriptions" class="nav-link {% if active_page == 'subscriptions' %}active{% endif %}">
+                    <span class="nav-icon">🔁</span> <span class="nav-text">Subscriptions</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
     <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar" id="sidebar">
+        <!-- Sidebar Navigation (Desktop) -->
+        <aside class="sidebar desktop-sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div class="brand-logo" title="MYREDGE">
@@ -65,19 +131,19 @@
         </main>
     </div>
 
-    <!-- Collapsible Sidebar State Persistence Script -->
+    <!-- Mobile Navigation & Collapsible Sidebar Persistence Script -->
     <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // Desktop Sidebar Persistence
         const sidebar = document.getElementById("sidebar");
         const toggleBtn = document.getElementById("sidebarToggle");
 
-        // Load saved state from localStorage
-        if (localStorage.getItem("sidebar-collapsed") === "true") {
+        if (localStorage.getItem("sidebar-collapsed") === "true" && sidebar) {
             sidebar.classList.add("collapsed");
             if (toggleBtn) toggleBtn.textContent = "▶";
         }
 
-        if (toggleBtn) {
+        if (toggleBtn && sidebar) {
             toggleBtn.addEventListener("click", function() {
                 sidebar.classList.toggle("collapsed");
                 const isCollapsed = sidebar.classList.contains("collapsed");
@@ -85,6 +151,42 @@
                 toggleBtn.textContent = isCollapsed ? "▶" : "◀";
             });
         }
+
+        // Mobile Navigation Drawer Toggle Handlers
+        const mobileToggle = document.getElementById("mobileMenuToggle");
+        const mobileDrawer = document.getElementById("mobileNavDrawer");
+        const mobileOverlay = document.getElementById("mobileNavOverlay");
+        const mobileClose = document.getElementById("mobileDrawerClose");
+
+        function openMobileMenu() {
+            if (mobileDrawer && mobileOverlay) {
+                mobileDrawer.classList.add("open");
+                mobileOverlay.classList.add("open");
+                mobileDrawer.setAttribute("aria-hidden", "false");
+                if (mobileToggle) mobileToggle.setAttribute("aria-expanded", "true");
+                document.body.style.overflow = "hidden";
+            }
+        }
+
+        function closeMobileMenu() {
+            if (mobileDrawer && mobileOverlay) {
+                mobileDrawer.classList.remove("open");
+                mobileOverlay.classList.remove("open");
+                mobileDrawer.setAttribute("aria-hidden", "true");
+                if (mobileToggle) mobileToggle.setAttribute("aria-expanded", "false");
+                document.body.style.overflow = "";
+            }
+        }
+
+        if (mobileToggle) mobileToggle.addEventListener("click", openMobileMenu);
+        if (mobileClose) mobileClose.addEventListener("click", closeMobileMenu);
+        if (mobileOverlay) mobileOverlay.addEventListener("click", closeMobileMenu);
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape" && mobileDrawer && mobileDrawer.classList.contains("open")) {
+                closeMobileMenu();
+            }
+        });
     });
     </script>
 </body>

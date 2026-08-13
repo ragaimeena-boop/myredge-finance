@@ -9,7 +9,7 @@
         <div class="page-subtitle">Dense, searchable ledger with keyword search and category filtering</div>
     </div>
     <div>
-        <form method="get" action="/transactions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <form method="get" action="/transactions" class="filter-form-mobile">
             <!-- Keyword Search Box -->
             <input 
                 type="text" 
@@ -17,7 +17,7 @@
                 value="{{ search_query }}" 
                 placeholder="🔍 Search merchant, memo, payee..." 
                 class="btn" 
-                style="width: 240px; text-align: left; background-color: var(--surface-color); color: var(--text-primary); border: 1px solid var(--border-color);"
+                style="min-width: 200px; text-align: left; background-color: var(--surface-color); color: var(--text-primary); border: 1px solid var(--border-color);"
             />
 
             <!-- Category Dropdown Filter -->
@@ -58,7 +58,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Merchant / Payee</th>
-                    <th>Account</th>
+                    <th class="hide-mobile">Account</th>
                     <th>Category</th>
                     <th style="text-align: right;">Amount</th>
                 </tr>
@@ -66,19 +66,19 @@
             <tbody>
                 {% for tx in transactions %}
                 <tr>
-                    <td class="num" style="color: var(--text-secondary);">{{ tx.posted_at }}</td>
+                    <td class="num" style="color: var(--text-secondary); white-space: nowrap;">{{ tx.posted_at }}</td>
                     <td>
                         <div><strong>{{ tx.payee or tx.description }}</strong></div>
-                        <div class="subtext">{{ tx.description }}</div>
+                        <div class="subtext hide-mobile">{{ tx.description }}</div>
                     </td>
-                    <td class="subtext">{{ tx.account_name }}</td>
+                    <td class="subtext hide-mobile">{{ tx.account_name }}</td>
                     <td>
                         <form action="/api/transactions/{{ tx.id }}/category" method="post" style="margin: 0;">
                             <select 
                                 name="category_id" 
                                 onchange="this.form.submit()" 
                                 class="badge" 
-                                style="background-color: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer; padding: 5px 8px; font-size: 13px; border-radius: var(--radius-sm);"
+                                style="background-color: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer; padding: 5px 8px; font-size: 13px; border-radius: var(--radius-sm); max-width: 130px;"
                             >
                                 <option value="" {% if not tx.category_id and not tx.is_transfer %}selected{% endif %}>Uncategorized</option>
                                 <option value="transfer" {% if tx.is_transfer %}selected{% endif %}>⚡ Transfer</option>
@@ -90,7 +90,7 @@
                             </select>
                         </form>
                     </td>
-                    <td class="num" style="text-align: right; font-weight: 600; color: {% if tx.is_transfer %}var(--text-secondary){% elif tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
+                    <td class="num" style="text-align: right; font-weight: 600; white-space: nowrap; color: {% if tx.is_transfer %}var(--text-secondary){% elif tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
                         {{ tx.formatted_amount }}
                     </td>
                 </tr>

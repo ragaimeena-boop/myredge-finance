@@ -139,10 +139,10 @@
             <tbody>
                 {% for tx in recent_transactions %}
                 <tr>
-                    <td class="num" style="color: var(--text-secondary);">{{ tx.posted_at }}</td>
+                    <td class="num" style="color: var(--text-secondary); white-space: nowrap;">{{ tx.posted_at }}</td>
                     <td>
                         <div><strong>{{ tx.payee or tx.description }}</strong></div>
-                        <div class="subtext">{{ tx.description }}</div>
+                        <div class="subtext hide-mobile">{{ tx.description }}</div>
                     </td>
                     <td>
                         {% if tx.is_transfer %}
@@ -155,7 +155,7 @@
                         <span class="badge badge-transfer">Uncategorized</span>
                         {% endif %}
                     </td>
-                    <td class="num" style="text-align: right; font-weight: 600; color: {% if tx.is_transfer %}var(--text-secondary){% elif tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
+                    <td class="num" style="text-align: right; font-weight: 600; white-space: nowrap; color: {% if tx.is_transfer %}var(--text-secondary){% elif tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
                         {{ tx.formatted_amount }}
                     </td>
                 </tr>
@@ -172,6 +172,8 @@
 <!-- Interactive Clickable Chart.js Script -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    const isMobile = window.innerWidth < 768;
+
     // --- 1. Expense MTD Doughnut Chart ---
     const expCtx = document.getElementById('categoryExpenseChart').getContext('2d');
     const expLabels = [{% for cat in monthly_report.categories %}"{{ cat.name }}"{% if not loop.last %},{% endif %}{% endfor %}];
@@ -207,7 +209,7 @@ document.addEventListener("DOMContentLoaded", function() {
             },
             plugins: {
                 legend: {
-                    position: 'right',
+                    position: isMobile ? 'bottom' : 'right',
                     labels: { color: '#94A3B8', font: { family: '-apple-system, sans-serif', size: 12 } }
                 },
                 tooltip: {
@@ -259,7 +261,7 @@ document.addEventListener("DOMContentLoaded", function() {
             },
             plugins: {
                 legend: {
-                    position: 'right',
+                    position: isMobile ? 'bottom' : 'right',
                     labels: { color: '#94A3B8', font: { family: '-apple-system, sans-serif', size: 12 } }
                 },
                 tooltip: {
