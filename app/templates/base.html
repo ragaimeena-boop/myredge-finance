@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>{% block title %}Financial Dashboard{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css?v=1.1">
+    
+    <!-- PWA Manifest & Mobile Native App Configuration -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0F1115">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MYREDGE">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 </head>
 <body>
     <!-- Mobile Navigation Top Header -->
@@ -187,6 +196,15 @@
                 closeMobileMenu();
             }
         });
+
+        // Register PWA Service Worker for Chrome Mobile Native Install Prompt
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.log('PWA ServiceWorker registration failed: ', err);
+                });
+            });
+        }
     });
     </script>
 </body>

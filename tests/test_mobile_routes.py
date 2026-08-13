@@ -48,3 +48,27 @@ def test_transactions_responsive_form_class(tmp_path, monkeypatch):
         response = client.get("/transactions")
         assert response.status_code == 200
         assert 'class="filter-form-mobile"' in response.text
+
+def test_pwa_manifest_and_sw_routes(tmp_path, monkeypatch):
+    """Verify PWA manifest.json and sw.js routes return correct content types and data."""
+    db_file = tmp_path / "test_mobile.db"
+    monkeypatch.setattr("app.config.settings.DATABASE_URL", f"sqlite:///{db_file}")
+
+    with TestClient(app) as client:
+        # Check manifest endpoint
+        manifest_res = client.get("/manifest.json")
+        assert manifest_res.status_code == 200
+        assert "application/manifest+json" in manifest_res.headers.get("content-type", "")
+        assert "MYREDGE" in manifest_res.text
+        assert "standalone" in manifest_res.text
+
+        # Check service worker endpoint
+        sw_res = client.get("/sw.js")
+        assert sw_res.status_code == 200
+        assert "javascript" in sw_res.headers.get("content-type", "")
+        assert "CACHE_NAME" in sw_res.text
+
+        # Check HTML contains PWA links
+        home_res = client.get("/")
+        assert 'rel="manifest"' in home_res.text
+        assert 'navigator.serviceWorker.register' in home_res.text

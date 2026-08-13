@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from fastapi import FastAPI, Request, BackgroundTasks, Query, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -89,6 +89,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Personal Finance Dashboard", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+@app.get("/manifest.json", include_in_schema=False)
+def get_manifest():
+    return FileResponse(BASE_DIR / "static" / "manifest.json", media_type="application/manifest+json")
+
+@app.get("/sw.js", include_in_schema=False)
+def get_service_worker():
+    return FileResponse(BASE_DIR / "static" / "sw.js", media_type="application/javascript")
 
 @app.get("/", response_class=HTMLResponse)
 def read_dashboard(request: Request):
