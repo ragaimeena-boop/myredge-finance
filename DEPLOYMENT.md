@@ -55,21 +55,27 @@ PORT=8585
 
 ---
 
-## 3. Running with Docker Compose or Unraid Docker UI
+## 3. Running on Unraid (Docker Compose or Docker CLI)
 
-### Option A: Docker Compose (Recommended)
+### Option A: Using `docker-compose` (Recommended for Unraid Terminal)
 Run the following inside `/mnt/user/appdata/finance-dashboard`:
 ```bash
-docker compose up -d --build
+docker-compose up -d --build
 ```
+*(Note: Unraid uses the hyphenated `docker-compose` command).*
 
-### Option B: Unraid Container Template (Manual Add)
-If adding via the Unraid **Docker -> Add Container** tab:
-- **Name**: `finance-dashboard`
-- **Repository**: Build locally or point to your repository build
-- **Network Type**: `Bridge`
-- **Host Port**: `8585` -> **Container Port**: `8585`
-- **Path Mapping**: `/mnt/user/appdata/finance-dashboard/data` -> `/app/data`
+### Option B: Building via Docker CLI (Without Docker Compose)
+If your Unraid does not have `docker-compose` installed:
+```bash
+cd /mnt/user/appdata/finance-dashboard
+docker build -t myredge-finance:latest .
+docker run -d \
+  --name finance-dashboard \
+  --restart unless-stopped \
+  -p 8588:8585 \
+  -v /mnt/user/appdata/finance-dashboard/data:/app/data \
+  myredge-finance:latest
+```
 
 ---
 
@@ -83,7 +89,7 @@ To expose the dashboard securely through your existing Cloudflared tunnel:
    - **Subdomain**: `finance` (or `money`)
    - **Domain**: `yourdomain.com`
    - **Service Type**: `HTTP`
-   - **URL**: `http://<UNRAID-LOCAL-IP>:8585` (e.g. `http://192.168.1.100:8585`)
+   - **URL**: `http://<UNRAID-LOCAL-IP>:8588` (e.g. `http://192.168.1.100:8588`)
 4. Save the hostname.
 
 You can now navigate to `https://finance.yourdomain.com` from anywhere in the world!

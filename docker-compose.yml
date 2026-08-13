@@ -6,7 +6,7 @@ services:
     container_name: finance-dashboard
     restart: unless-stopped
     ports:
-      - "8585:8585"
+      - "8588:8585"
     environment:
       - SIMPLEFIN_ACCESS_URL=${SIMPLEFIN_ACCESS_URL:-}
       - DATABASE_URL=sqlite:///./data/finance.db
