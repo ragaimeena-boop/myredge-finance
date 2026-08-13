@@ -27,7 +27,7 @@ Unraid server as a Docker container, not on public cloud.
 - Database: SQLite (integer cents storage, stored in persistent data volume)
 - Frontend: Jinja2 templates + HTML5 / Vanilla CSS (dark mode default per branddesign.md)
 - Scheduler for the daily pull: APScheduler (US Eastern timezone `America/New_York`)
-- Deployment target: Docker container on Unraid (self-hosted web dashboard)
+- Deployment target: Docker container on Unraid built directly from GitHub repository (no docker-compose)
 
 ## 3. SimpleFIN specifics the agent must respect
 

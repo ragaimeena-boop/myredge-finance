@@ -55,25 +55,30 @@ PORT=8585
 
 ---
 
-## 3. Running on Unraid (Docker Compose or Docker CLI)
+## 3. Running & Updating on Unraid (GitHub Pull Container)
 
-### Option A: Using `docker-compose` (Recommended for Unraid Terminal)
-Run the following inside `/mnt/user/appdata/finance-dashboard`:
-```bash
-docker-compose up -d --build
-```
-*(Note: Unraid uses the hyphenated `docker-compose` command).*
+The container builds directly from your GitHub repository (no `docker-compose` needed):
 
-### Option B: Building via Docker CLI (Without Docker Compose)
-If your Unraid does not have `docker-compose` installed:
+### Initial Container Setup or Rebuild:
+1. Push your latest code changes to your GitHub repository:
+   ```bash
+   git push origin main
+   ```
+2. On your Unraid Web UI:
+   - Go to the **Docker** tab.
+   - Click on the `finance-dashboard` container.
+   - Click **Force Update** or **Apply/Rebuild**.
+
+### Alternatively via Unraid Terminal:
 ```bash
-cd /mnt/user/appdata/finance-dashboard
-docker build -t myredge-finance:latest .
+docker build -t myredge-finance:latest https://github.com/ragaimeena-boop/myredge-finance.git#main
+docker stop finance-dashboard && docker rm finance-dashboard
 docker run -d \
   --name finance-dashboard \
   --restart unless-stopped \
   -p 8588:8585 \
   -v /mnt/user/appdata/finance-dashboard/data:/app/data \
+  --env-file /mnt/user/appdata/finance-dashboard/.env \
   myredge-finance:latest
 ```
 
