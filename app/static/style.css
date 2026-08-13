@@ -409,3 +409,81 @@ tr:hover td {
 .btn-primary:hover {
   background-color: #7DD3FC;
 }
+
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVE STYLES
+   ========================================================================== */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    padding: 16px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .sidebar.collapsed {
+    width: 100% !important;
+    padding: 16px 12px;
+  }
+
+  .sidebar.collapsed .brand-title,
+  .sidebar.collapsed .nav-text {
+    display: inline !important;
+  }
+
+  .sidebar-header {
+    margin-bottom: 16px;
+    padding-left: 0;
+  }
+
+  .sidebar-toggle-btn {
+    display: none;
+  }
+
+  .nav-list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    gap: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-link {
+    padding: 8px 12px;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .main-content {
+    padding: 16px 12px;
+  }
+
+  .grid-4, .grid-2 {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .hero-number {
+    font-size: 28px;
+  }
+
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 550px;
+  }
+}
