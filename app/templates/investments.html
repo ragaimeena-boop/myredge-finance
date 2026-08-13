@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Investments & Portfolio - MYREDGE Finance{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Investments & Portfolio</h1>
+        <div class="page-subtitle">Charles Schwab, Transamerica 401(k), & Brokerage Analytics</div>
+    </div>
+</div>
+
+<!-- Stock Ticker Banner -->
+<div style="background-color: var(--surface-color); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 24px; display: flex; gap: 16px; overflow-x: auto; align-items: center;">
+    <div style="font-weight: 700; font-size: 12px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; padding-right: 8px; border-right: 1px solid var(--border-color);">
+        ⚡ Live Ticker
+    </div>
+    {% for item in report.holdings %}
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap;">
+        <strong>{{ item.ticker }}</strong>
+        <span class="num">{{ item.formatted_price }}</span>
+        <span class="badge {% if item.day_change_pct >= 0 %}badge-income{% else %}badge-expense{% endif %}" style="padding: 2px 6px; font-size: 11px;">
+            {% if item.day_change_pct >= 0 %}▲ +{% else %}▼ {% endif %}{{ item.day_change_pct }}%
+        </span>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Headline Metric Cards -->
+<div class="grid-4" style="margin-bottom: 28px;">
+    <div class="card">
+        <div class="card-title">Total Investment Value</div>
+        <div class="hero-number income num">{{ report.formatted_portfolio_value }}</div>
+        <div class="subtext">Across all brokerage & retirement</div>
+    </div>
+
+    <!-- Top Gainer Card -->
+    <div class="card" style="border-left: 3px solid var(--income-color);">
+        <div class="card-title">Today's Top Gainer</div>
+        {% if report.top_gainer %}
+        <div class="hero-number income num" style="font-size: 26px;">{{ report.top_gainer.ticker }}</div>
+        <div class="subtext income" style="font-weight: 600;">
+            ▲ +{{ report.top_gainer.day_change_pct }}% ({{ report.top_gainer.formatted_price }})
+        </div>
+        {% else %}
+        <div class="subtext">N/A</div>
+        {% endif %}
+    </div>
+
+    <!-- Top Loser Card -->
+    <div class="card" style="border-left: 3px solid var(--expense-color);">
+        <div class="card-title">Today's Top Loser</div>
+        {% if report.top_loser %}
+        <div class="hero-number expense num" style="font-size: 26px;">{{ report.top_loser.ticker }}</div>
+        <div class="subtext expense" style="font-weight: 600;">
+            ▼ {{ report.top_loser.day_change_pct }}% ({{ report.top_loser.formatted_price }})
+        </div>
+        {% else %}
+        <div class="subtext">N/A</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-title">Investment Accounts</div>
+        <div class="hero-number num" style="color: var(--accent-color);">{{ report.accounts | length }}</div>
+        <div class="subtext">Connected institutions</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Interactive Portfolio Allocation Chart -->
+    <div class="card">
+        <div class="card-title">Asset Class Allocation (Retirement vs Stock/ETF)</div>
+        <div style="position: relative; height: 260px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="portfolioAllocationChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Connected Investment Accounts -->
+    <div class="card">
+        <div class="card-title">Connected Investment Accounts</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Account Name</th>
+                        <th>Institution</th>
+                        <th style="text-align: right;">Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for acc in report.accounts %}
+                    <tr>
+                        <td><strong>{{ acc.name }}</strong></td>
+                        <td>
+                            {% if acc.org_domain %}
+                            <a href="https://{{ acc.org_domain }}" target="_blank" rel="noopener noreferrer" class="institution-link">
+                                {{ acc.org_name or acc.org_domain }} <span class="ext-icon">↗</span>
+                            </a>
+                            {% else %}
+                            <span>{{ acc.org_name or 'Institution' }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="num" style="text-align: right; font-weight: 600; color: var(--income-color);">
+                            {{ acc.formatted_balance }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Holdings Table -->
+<div class="card" style="margin-bottom: 28px;">
+    <div class="card-title">Stock & ETF Holdings</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ticker / Security</th>
+                    <th>Asset Type</th>
+                    <th>Account</th>
+                    <th style="text-align: right;">Shares</th>
+                    <th style="text-align: right;">Current Price</th>
+                    <th style="text-align: right;">Market Value</th>
+                    <th style="text-align: right;">Today %</th>
+                    <th style="text-align: right;">Total Gain/Loss</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in report.holdings %}
+                <tr>
+                    <td>
+                        <div><strong>{{ h.ticker }}</strong> <span class="subtext">({{ h.name }})</span></div>
+                    </td>
+                    <td><span class="badge badge-transfer">{{ h.asset_type }}</span></td>
+                    <td class="subtext">{{ h.account_name }}</td>
+                    <td class="num" style="text-align: right;">{{ h.shares }}</td>
+                    <td class="num" style="text-align: right;">{{ h.formatted_price }}</td>
+                    <td class="num" style="text-align: right; font-weight: 600;">{{ h.formatted_market_value }}</td>
+                    <td class="num" style="text-align: right;">
+                        <span class="badge {% if h.day_change_pct >= 0 %}badge-income{% else %}badge-expense{% endif %}">
+                            {% if h.day_change_pct >= 0 %}+{% endif %}{{ h.day_change_pct }}%
+                        </span>
+                    </td>
+                    <td class="num {% if h.gain_loss_cents >= 0 %}income{% else %}expense{% endif %}" style="text-align: right; font-weight: 600;">
+                        {{ h.formatted_gain_loss }} ({{ h.gain_loss_pct }}%)
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="subtext">No holdings recorded.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Investment Transactions Ledger -->
+<div class="card">
+    <div class="card-title">Investment Account Activity & Dividend Transactions</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Activity / Description</th>
+                    <th>Account</th>
+                    <th>Category</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in report.transactions %}
+                <tr>
+                    <td class="num" style="color: var(--text-secondary);">{{ tx.posted_at }}</td>
+                    <td>
+                        <div><strong>{{ tx.payee or tx.description }}</strong></div>
+                        <div class="subtext">{{ tx.description }}</div>
+                    </td>
+                    <td class="subtext">{{ tx.account_name }}</td>
+                    <td>
+                        <a href="/transactions?category_id={{ tx.category_id }}" class="badge" style="background-color: rgba(56, 189, 248, 0.15); color: var(--accent-color); text-decoration: none;">
+                            {{ tx.category_name or 'Investment' }}
+                        </a>
+                    </td>
+                    <td class="num" style="text-align: right; font-weight: 600; color: {% if tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
+                        {{ tx.formatted_amount }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="subtext">No investment transactions found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Chart.js Allocation Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const ctx = document.getElementById('portfolioAllocationChart').getContext('2d');
+    const allocLabels = [{% for item in report.asset_allocation %}"{{ item.type }}"{% if not loop.last %},{% endif %}{% endfor %}];
+    const allocData = [{% for item in report.asset_allocation %}{{ (item.value_cents / 100) | round(2) }}{% if not loop.last %},{% endif %}{% endfor %}];
+    const allocColors = [{% for item in report.asset_allocation %}"{{ item.color }}"{% if not loop.last %},{% endif %}{% endfor %}];
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: allocLabels,
+            datasets: [{
+                data: allocData,
+                backgroundColor: allocColors,
+                borderWidth: 2,
+                borderColor: '#171A21'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { color: '#94A3B8', font: { size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            let value = context.parsed || 0;
+                            return label + ': $' + value.toLocaleString('en-US', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            cutout: '60%'
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Transactions Explorer - MYREDGE Finance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Transaction History</h1>
+        <div class="page-subtitle">Dense, searchable ledger with keyword search and category filtering</div>
+    </div>
+    <div>
+        <form method="get" action="/transactions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <!-- Keyword Search Box -->
+            <input 
+                type="text" 
+                name="q" 
+                value="{{ search_query }}" 
+                placeholder="🔍 Search merchant, memo, payee..." 
+                class="btn" 
+                style="width: 240px; text-align: left; background-color: var(--surface-color); color: var(--text-primary); border: 1px solid var(--border-color);"
+            />
+
+            <!-- Category Dropdown Filter -->
+            <select name="category_id" onchange="this.form.submit()" class="btn" style="background-color: var(--surface-color); color: var(--text-primary); cursor: pointer;">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>
+                    {{ cat.name }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn-primary">Search</button>
+
+            {% if active_filter_label or search_query %}
+            <a href="/transactions" class="btn" style="color: var(--expense-color);">✕ Clear Filters</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if search_query or active_filter_label %}
+<div style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">
+    Active Filters: 
+    {% if search_query %}
+    Keyword <strong style="color: var(--accent-color);">"{{ search_query }}"</strong>
+    {% endif %}
+    {% if active_filter_label %}
+    {% if search_query %} • {% endif %}Category <strong style="color: var(--accent-color);">"{{ active_filter_label }}"</strong>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Merchant / Payee</th>
+                    <th>Account</th>
+                    <th>Category</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in transactions %}
+                <tr>
+                    <td class="num" style="color: var(--text-secondary);">{{ tx.posted_at }}</td>
+                    <td>
+                        <div><strong>{{ tx.payee or tx.description }}</strong></div>
+                        <div class="subtext">{{ tx.description }}</div>
+                    </td>
+                    <td class="subtext">{{ tx.account_name }}</td>
+                    <td>
+                        <form action="/api/transactions/{{ tx.id }}/category" method="post" style="margin: 0;">
+                            <select 
+                                name="category_id" 
+                                onchange="this.form.submit()" 
+                                class="badge" 
+                                style="background-color: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); cursor: pointer; padding: 5px 8px; font-size: 13px; border-radius: var(--radius-sm);"
+                            >
+                                <option value="" {% if not tx.category_id and not tx.is_transfer %}selected{% endif %}>Uncategorized</option>
+                                <option value="transfer" {% if tx.is_transfer %}selected{% endif %}>⚡ Transfer</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}" {% if tx.category_id == cat.id and not tx.is_transfer %}selected{% endif %}>
+                                    {{ cat.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </td>
+                    <td class="num" style="text-align: right; font-weight: 600; color: {% if tx.is_transfer %}var(--text-secondary){% elif tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
+                        {{ tx.formatted_amount }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="subtext">No transactions found matching your search query.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  finance-dashboard:
+    build: .
+    container_name: finance-dashboard
+    restart: unless-stopped
+    ports:
+      - "8585:8585"
+    environment:
+      - SIMPLEFIN_ACCESS_URL=${SIMPLEFIN_ACCESS_URL:-}
+      - DATABASE_URL=sqlite:///./data/finance.db
+      - TIMEZONE=America/New_York
+      - PORT=8585
+    volumes:
+      - ./data:/app/data

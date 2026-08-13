@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}MYREDGE Financial Dashboard{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">MYREDGE Dashboard</h1>
+        <div class="page-subtitle">SimpleFIN Daily Sync • Eastern Time Zone</div>
+    </div>
+    <div>
+        <form action="/api/sync" method="post" style="display:inline;">
+            <button type="submit" class="btn btn-primary">⚡ Sync Now</button>
+        </form>
+    </div>
+</div>
+
+<!-- Key Financial Cards -->
+<div class="grid-4">
+    <div class="card">
+        <div class="card-title">Net Worth</div>
+        <div class="hero-number num">{{ net_worth.formatted_net_worth }}</div>
+        <div class="subtext">Assets: {{ net_worth.formatted_assets }}</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Month-to-Date Income</div>
+        <div class="hero-number income num">{{ monthly_report.formatted_income }}</div>
+        <div class="subtext">{{ monthly_report.month_name }} (1st to Today)</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Month-to-Date Expenses</div>
+        <div class="hero-number expense num">{{ monthly_report.formatted_expense }}</div>
+        <div class="subtext">{{ monthly_report.month_name }} (1st to Today)</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Net Cash Flow</div>
+        <div class="hero-number num {% if monthly_report.net_flow_cents >= 0 %}income{% else %}expense{% endif %}">
+            {{ monthly_report.formatted_net_flow }}
+        </div>
+        <div class="subtext">Savings Rate: {{ monthly_report.savings_rate_pct }}%</div>
+    </div>
+</div>
+
+<!-- Interactive MTD Pie Graphs Grid -->
+<div class="grid-2">
+    <!-- MTD Expense Distribution Chart -->
+    <div class="card">
+        <div class="card-title">Month-to-Date Spending • Click slice to view items</div>
+        <div style="position: relative; height: 260px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="categoryExpenseChart"></canvas>
+        </div>
+    </div>
+
+    <!-- MTD Income Distribution Chart -->
+    <div class="card">
+        <div class="card-title">Month-to-Date Income • Click slice to view items</div>
+        <div style="position: relative; height: 260px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="categoryIncomeChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Detailed Category Breakdown Bars -->
+    <div class="card">
+        <div class="card-title">Top Spending Categories (MTD)</div>
+        <div class="category-list">
+            {% for cat in monthly_report.categories[:6] %}
+            <div class="category-item">
+                <div class="category-meta">
+                    <a href="/transactions?category_id={{ cat.id }}" class="category-name" style="color: var(--accent-color); font-weight: 600; text-decoration: none;">
+                        {{ cat.name }} ↗
+                    </a>
+                    <span class="num">{{ cat.formatted_total }} ({{ cat.percentage }}%)</span>
+                </div>
+                <div class="bar-container">
+                    <div class="bar-fill" style="width: {{ cat.percentage }}%; background-color: {{ cat.color }};"></div>
+                </div>
+            </div>
+            {% else %}
+            <div class="subtext">No expense data available for this month.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Connected Accounts & Financial Institutions -->
+    <div class="card">
+        <div class="card-title">Accounts & Financial Institutions</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        <th>Financial Institution</th>
+                        <th style="text-align: right;">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for acc in net_worth.accounts %}
+                    <tr>
+                        <td><strong>{{ acc.name }}</strong></td>
+                        <td>
+                            {% if acc.institution_url %}
+                            <a href="{{ acc.institution_url }}" target="_blank" rel="noopener noreferrer" class="institution-link">
+                                {{ acc.org_name or acc.org_domain }} <span class="ext-icon">↗</span>
+                            </a>
+                            {% else %}
+                            <span>{{ acc.org_name or 'Bank' }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="num" style="text-align: right; font-weight: 600;">{{ acc.formatted_balance }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="subtext">No accounts connected yet. Run sync to populate.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="card">
+    <div class="card-title">Recent Transactions</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Merchant / Payee</th>
+                    <th>Category</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in recent_transactions %}
+                <tr>
+                    <td class="num" style="color: var(--text-secondary);">{{ tx.posted_at }}</td>
+                    <td>
+                        <div><strong>{{ tx.payee or tx.description }}</strong></div>
+                        <div class="subtext">{{ tx.description }}</div>
+                    </td>
+                    <td>
+                        {% if tx.is_transfer %}
+                        <span class="badge badge-transfer">Transfer</span>
+                        {% elif tx.category_name %}
+                        <a href="/transactions?category_id={{ tx.category_id }}" class="badge" style="background-color: rgba(56, 189, 248, 0.15); color: var(--accent-color); text-decoration: none; border: 1px solid rgba(56, 189, 248, 0.3);">
+                            {{ tx.category_name }}
+                        </a>
+                        {% else %}
+                        <span class="badge badge-transfer">Uncategorized</span>
+                        {% endif %}
+                    </td>
+                    <td class="num" style="text-align: right; font-weight: 600; color: {% if tx.is_transfer %}var(--text-secondary){% elif tx.amount_cents > 0 %}var(--income-color){% else %}var(--expense-color){% endif %};">
+                        {{ tx.formatted_amount }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="subtext">No transactions synced yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Interactive Clickable Chart.js Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // --- 1. Expense MTD Doughnut Chart ---
+    const expCtx = document.getElementById('categoryExpenseChart').getContext('2d');
+    const expLabels = [{% for cat in monthly_report.categories %}"{{ cat.name }}"{% if not loop.last %},{% endif %}{% endfor %}];
+    const expIds = [{% for cat in monthly_report.categories %}{{ cat.id }}{% if not loop.last %},{% endif %}{% endfor %}];
+    const expData = [{% for cat in monthly_report.categories %}{{ (cat.total_cents / 100) | round(2) }}{% if not loop.last %},{% endif %}{% endfor %}];
+    const expColors = [{% for cat in monthly_report.categories %}"{{ cat.color }}"{% if not loop.last %},{% endif %}{% endfor %}];
+
+    new Chart(expCtx, {
+        type: 'doughnut',
+        data: {
+            labels: expLabels.length > 0 ? expLabels : ["No Spending"],
+            datasets: [{
+                data: expData.length > 0 ? expData : [1],
+                backgroundColor: expColors.length > 0 ? expColors : ["#334155"],
+                borderWidth: 2,
+                borderColor: '#171A21'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            onClick: function(evt, elements) {
+                if (elements && elements.length > 0) {
+                    const idx = elements[0].index;
+                    const catId = expIds[idx];
+                    if (catId) {
+                        window.location.href = '/transactions?category_id=' + catId;
+                    }
+                }
+            },
+            onHover: function(evt, elements) {
+                evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+            },
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { color: '#94A3B8', font: { family: '-apple-system, sans-serif', size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            let value = context.parsed || 0;
+                            return label + ': $' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+
+    // --- 2. Income MTD Doughnut Chart ---
+    const incCtx = document.getElementById('categoryIncomeChart').getContext('2d');
+    const incLabels = [{% for cat in monthly_report.income_categories %}"{{ cat.name }}"{% if not loop.last %},{% endif %}{% endfor %}];
+    const incIds = [{% for cat in monthly_report.income_categories %}{{ cat.id }}{% if not loop.last %},{% endif %}{% endfor %}];
+    const incData = [{% for cat in monthly_report.income_categories %}{{ (cat.total_cents / 100) | round(2) }}{% if not loop.last %},{% endif %}{% endfor %}];
+    const incColors = [{% for cat in monthly_report.income_categories %}"{{ cat.color }}"{% if not loop.last %},{% endif %}{% endfor %}];
+
+    new Chart(incCtx, {
+        type: 'doughnut',
+        data: {
+            labels: incLabels.length > 0 ? incLabels : ["No Income"],
+            datasets: [{
+                data: incData.length > 0 ? incData : [1],
+                backgroundColor: incColors.length > 0 ? incColors : ["#334155"],
+                borderWidth: 2,
+                borderColor: '#171A21'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            onClick: function(evt, elements) {
+                if (elements && elements.length > 0) {
+                    const idx = elements[0].index;
+                    const catId = incIds[idx];
+                    if (catId) {
+                        window.location.href = '/transactions?category_id=' + catId;
+                    }
+                }
+            },
+            onHover: function(evt, elements) {
+                evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+            },
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { color: '#94A3B8', font: { family: '-apple-system, sans-serif', size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            let value = context.parsed || 0;
+                            return label + ': $' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+});
+</script>
+{% endblock %}

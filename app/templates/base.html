@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Financial Dashboard{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="brand-logo" title="MYREDGE">
+                        <span class="brand-logo-text">ME</span>
+                    </div>
+                    <div class="brand-title">MYR<span>EDGE</span></div>
+                </div>
+                <button id="sidebarToggle" class="sidebar-toggle-btn" title="Toggle Sidebar">◀</button>
+            </div>
+
+            <ul class="nav-list">
+                <li>
+                    <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" title="Dashboard">
+                        <span class="nav-icon">📊</span> <span class="nav-text">Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/reports/weekly" class="nav-link {% if active_page == 'weekly' %}active{% endif %}" title="Weekly Report">
+                        <span class="nav-icon">📅</span> <span class="nav-text">Weekly Report</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/reports/monthly" class="nav-link {% if active_page == 'monthly' %}active{% endif %}" title="Monthly Report">
+                        <span class="nav-icon">📆</span> <span class="nav-text">Monthly Report</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/reports/yearly" class="nav-link {% if active_page == 'yearly' %}active{% endif %}" title="Yearly Report">
+                        <span class="nav-icon">📈</span> <span class="nav-text">Yearly Report</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/transactions" class="nav-link {% if active_page == 'transactions' %}active{% endif %}" title="Transactions">
+                        <span class="nav-icon">💳</span> <span class="nav-text">Transactions</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/investments" class="nav-link {% if active_page == 'investments' %}active{% endif %}" title="Investments">
+                        <span class="nav-icon">📈</span> <span class="nav-text">Investments</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/subscriptions" class="nav-link {% if active_page == 'subscriptions' %}active{% endif %}" title="Subscriptions">
+                        <span class="nav-icon">🔁</span> <span class="nav-text">Subscriptions</span>
+                    </a>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Content Body -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Collapsible Sidebar State Persistence Script -->
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const sidebar = document.getElementById("sidebar");
+        const toggleBtn = document.getElementById("sidebarToggle");
+
+        // Load saved state from localStorage
+        if (localStorage.getItem("sidebar-collapsed") === "true") {
+            sidebar.classList.add("collapsed");
+            if (toggleBtn) toggleBtn.textContent = "▶";
+        }
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener("click", function() {
+                sidebar.classList.toggle("collapsed");
+                const isCollapsed = sidebar.classList.contains("collapsed");
+                localStorage.setItem("sidebar-collapsed", isCollapsed ? "true" : "false");
+                toggleBtn.textContent = isCollapsed ? "▶" : "◀";
+            });
+        }
+    });
+    </script>
+</body>
+</html>

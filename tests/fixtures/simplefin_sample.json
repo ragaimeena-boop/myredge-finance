@@ -1,0 +1,78 @@
+{
+  "errors": [],
+  "accounts": [
+    {
+      "id": "acc_checking_01",
+      "name": "Everyday Checking",
+      "currency": "USD",
+      "balance": "4520.50",
+      "available-balance": "4520.50",
+      "balance-date": 1691884800,
+      "org": {
+        "domain": "chase.com",
+        "name": "Chase Bank"
+      },
+      "transactions": [
+        {
+          "id": "tx_001",
+          "posted": 1691880000,
+          "amount": "-45.20",
+          "description": "TST* CHIPOTLE MEXICAN GRILL MIAMI FL",
+          "payee": "Chipotle",
+          "memo": "Lunch",
+          "pending": false
+        },
+        {
+          "id": "tx_002",
+          "posted": 1691793600,
+          "amount": "3200.00",
+          "description": "PAYROLL DIRECT DEPOSIT HOSPITAL INC",
+          "payee": "Hospital Inc",
+          "memo": "Biweekly salary",
+          "pending": false
+        },
+        {
+          "id": "tx_003",
+          "posted": 1691707200,
+          "amount": "-500.00",
+          "description": "AUTOPAY CREDIT CARD PAYMENT",
+          "payee": "Chase Card Services",
+          "memo": "Credit card payment",
+          "pending": false
+        }
+      ]
+    },
+    {
+      "id": "acc_credit_01",
+      "name": "Sapphire Reserve Credit Card",
+      "currency": "USD",
+      "balance": "-1250.75",
+      "available-balance": "8749.25",
+      "balance-date": 1691884800,
+      "org": {
+        "domain": "chase.com",
+        "name": "Chase Bank"
+      },
+      "transactions": [
+        {
+          "id": "tx_101",
+          "posted": 1691707200,
+          "amount": "500.00",
+          "description": "PAYMENT THANK YOU",
+          "payee": "Chase",
+          "memo": "Card payment credit",
+          "pending": false
+        },
+        {
+          "id": "tx_102",
+          "posted": 1691620800,
+          "amount": "-120.50",
+          "description": "FLORIDA POWER & LIGHT UTILITY",
+          "payee": "FPL",
+          "memo": "Electric bill",
+          "pending": false
+        }
+      ]
+    }
+  ]
+}

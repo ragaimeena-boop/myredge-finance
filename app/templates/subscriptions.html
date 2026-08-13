@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Subscriptions Radar - MYREDGE Finance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Subscriptions & Recurring Bills</h1>
+        <div class="page-subtitle">Track recurring monthly commitments and quickly manage or cancel subscriptions</div>
+    </div>
+</div>
+
+<div class="grid-4" style="margin-bottom: 28px;">
+    <div class="card">
+        <div class="card-title">Monthly Commitment</div>
+        <div class="hero-number expense num">{{ report.formatted_monthly_total }}</div>
+        <div class="subtext">Estimated monthly spend</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Annual Commitment</div>
+        <div class="hero-number expense num">{{ report.formatted_annual_total }}</div>
+        <div class="subtext">Projected 12-month cost</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Active Subscriptions</div>
+        <div class="hero-number income num">{{ report.count }}</div>
+        <div class="subtext">Detected recurring items</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Active Subscriptions & Recurring Services</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Merchant / Service</th>
+                    <th>Category</th>
+                    <th>Last Billed Date</th>
+                    <th style="text-align: right;">Monthly Cost</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sub in report.subscriptions %}
+                <tr>
+                    <td>
+                        <div><strong>{{ sub.merchant }}</strong></div>
+                        <div class="subtext">{{ sub.description }}</div>
+                    </td>
+                    <td>
+                        <a href="/transactions?category_name={{ sub.category_name | urlencode }}" class="badge" style="background-color: rgba(255,255,255,0.08); color: var(--text-primary); text-decoration: none;">
+                            {{ sub.category_name }}
+                        </a>
+                    </td>
+                    <td class="num" style="color: var(--text-secondary);">{{ sub.last_charge_date }}</td>
+                    <td class="num expense" style="text-align: right; font-weight: 600;">
+                        {{ sub.formatted_amount }}
+                    </td>
+                    <td style="text-align: right;">
+                        <a href="{{ sub.cancel_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="padding: 4px 10px; font-size: 12px;">
+                            Cancel / Manage ↗
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="subtext">No recurring subscriptions or utility bills detected yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

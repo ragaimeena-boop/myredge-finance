@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Weekly Financial Report - Personal Finance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Weekly Digest Report</h1>
+        <div class="page-subtitle">Period: {{ report.start_date }} to {{ report.end_date }}</div>
+    </div>
+</div>
+
+<div class="grid-4">
+    <div class="card">
+        <div class="card-title">Weekly Expenses</div>
+        <div class="hero-number expense num">{{ report.formatted_expense }}</div>
+        <div class="subtext">
+            {% if report.expense_pct_change > 0 %}
+            ▲ +{{ report.expense_pct_change }}% vs prior week
+            {% elif report.expense_pct_change < 0 %}
+            ▼ {{ report.expense_pct_change }}% vs prior week
+            {% else %}
+            Same as prior week
+            {% endif %}
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-title">Weekly Income</div>
+        <div class="hero-number income num">{{ report.formatted_income }}</div>
+        <div class="subtext">Total received</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Weekly Net Cash Flow</div>
+        <div class="hero-number num {% if report.net_flow_cents >= 0 %}income{% else %}expense{% endif %}">
+            {{ report.formatted_net_flow }}
+        </div>
+        <div class="subtext">Net savings this week</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Prior Week Expenses</div>
+        <div class="hero-number num" style="color: var(--text-secondary);">{{ report.formatted_prev_expense }}</div>
+        <div class="subtext">Previous 7-day total</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-title">Top Weekly Categories</div>
+        <div class="category-list">
+            {% for cat in report.top_categories %}
+            <div class="category-item">
+                <div class="category-meta">
+                    <span class="category-name">{{ cat.name }}</span>
+                    <span class="num">{{ cat.formatted_total }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="subtext">No category data for this week.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Top Weekly Merchants</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Merchant</th>
+                        <th>Tx Count</th>
+                        <th style="text-align: right;">Total Spent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in report.top_merchants %}
+                    <tr>
+                        <td><strong>{{ m.merchant }}</strong></td>
+                        <td class="num">{{ m.count }}</td>
+                        <td class="num" style="text-align: right; font-weight: 600;">{{ m.formatted_total }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="subtext">No merchant data available for this week.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

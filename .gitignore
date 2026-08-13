@@ -1,0 +1,13 @@
+# Databases & Secrets
+data/
+*.db
+*.sqlite
+.env
+
+# Python Cache & Virtual Environments
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+myredge-finance-dashboard.zip

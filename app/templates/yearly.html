@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Yearly Financial Report - Personal Finance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Yearly Financial Retrospective</h1>
+        <div class="page-subtitle">Year {{ report.year }} Annual Analytics</div>
+    </div>
+</div>
+
+<div class="grid-4">
+    <div class="card">
+        <div class="card-title">Annual Income</div>
+        <div class="hero-number income num">{{ report.formatted_income }}</div>
+        <div class="subtext">Year-to-date total</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Annual Expenses</div>
+        <div class="hero-number expense num">{{ report.formatted_expense }}</div>
+        <div class="subtext">Year-to-date total</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Annual Net Savings</div>
+        <div class="hero-number num {% if report.net_flow_cents >= 0 %}income{% else %}expense{% endif %}">
+            {{ report.formatted_net_flow }}
+        </div>
+        <div class="subtext">Total cash accumulation</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Average Savings Rate</div>
+        <div class="hero-number income num">{{ report.savings_rate_pct }}%</div>
+        <div class="subtext">Annual efficiency</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Month-by-Month Trajectory ({{ report.year }})</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th style="text-align: right;">Income</th>
+                    <th style="text-align: right;">Expenses</th>
+                    <th style="text-align: right;">Net Savings</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in report.monthly_trends %}
+                <tr>
+                    <td><strong>{{ m.month_short }}</strong></td>
+                    <td class="num income" style="text-align: right;">{{ m.formatted_income }}</td>
+                    <td class="num expense" style="text-align: right;">{{ m.formatted_expense }}</td>
+                    <td class="num {% if m.net_cents >= 0 %}income{% else %}expense{% endif %}" style="text-align: right; font-weight: 600;">
+                        {{ m.formatted_net }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

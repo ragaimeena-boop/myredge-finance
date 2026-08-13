@@ -1,0 +1,309 @@
+import json
+from pathlib import Path
+from datetime import datetime
+from fastapi import FastAPI, Request, BackgroundTasks, Query, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from apscheduler.schedulers.background import BackgroundScheduler
+import pytz
+from contextlib import asynccontextmanager
+
+from app.config import settings
+from app.database import init_db, get_connection
+from app.utils import get_eastern_tz, current_eastern_time, format_currency
+from app.models import SimpleFINResponse
+from app.simplefin import SimpleFINClient, ingest_simplefin_data
+from app.reports import (
+    generate_weekly_report,
+    generate_monthly_report,
+    generate_yearly_report,
+    calculate_net_worth,
+    get_subscriptions_summary,
+    get_date_bounds_for_week
+)
+
+BASE_DIR = Path(__file__).resolve().parent
+scheduler = BackgroundScheduler(timezone=pytz.timezone(settings.TIMEZONE))
+
+def run_daily_sync():
+    """Daily sync task executed by APScheduler in US Eastern Time."""
+    conn = get_connection()
+    try:
+        if settings.SIMPLEFIN_ACCESS_URL:
+            client = SimpleFINClient()
+            data = client.fetch_data()
+        else:
+            # Fallback to fixture data if no Access URL provided yet
+            fixture_path = BASE_DIR.parent / "tests" / "fixtures" / "simplefin_sample.json"
+            if fixture_path.exists():
+                with open(fixture_path, "r") as f:
+                    raw_json = json.load(f)
+                
+                # Dynamically set posted timestamps relative to current month
+                now_ts = int(current_eastern_time().timestamp())
+                day_sec = 86400
+                offset_days = [1, 2, 3, 3, 4]
+                idx = 0
+                for acc in raw_json.get("accounts", []):
+                    for tx in acc.get("transactions", []):
+                        d_offset = offset_days[idx % len(offset_days)]
+                        tx["posted"] = now_ts - (d_offset * day_sec)
+                        idx += 1
+
+                data = SimpleFINResponse.model_validate(raw_json)
+            else:
+                return
+
+        ingest_simplefin_data(data, conn=conn)
+    finally:
+        conn.close()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager: initializes database and starts daily scheduler."""
+    init_db()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM accounts;")
+    if cursor.fetchone()[0] == 0:
+        run_daily_sync()
+    conn.close()
+
+    scheduler.add_job(run_daily_sync, 'cron', hour=6, minute=0, id='daily_simplefin_pull', replace_existing=True)
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+
+app = FastAPI(title="Personal Finance Dashboard", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+@app.get("/", response_class=HTMLResponse)
+def read_dashboard(request: Request):
+    """Dashboard Homepage view."""
+    now = current_eastern_time()
+    conn = get_connection()
+    try:
+        net_worth = calculate_net_worth(conn=conn)
+        monthly_report = generate_monthly_report(now.year, now.month, conn=conn)
+        
+        # Recent transactions
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT t.*, a.name as account_name, c.name as category_name
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        ORDER BY t.posted_at DESC, t.posted_timestamp DESC
+        LIMIT 10;
+        """)
+        recent_txs = []
+        for row in cursor.fetchall():
+            tx_dict = dict(row)
+            tx_dict["formatted_amount"] = format_currency(tx_dict["amount_cents"])
+            recent_txs.append(tx_dict)
+
+        return templates.TemplateResponse(request=request, name="index.html", context={
+            "active_page": "dashboard",
+            "net_worth": net_worth,
+            "monthly_report": monthly_report,
+            "recent_transactions": recent_txs
+        })
+    finally:
+        conn.close()
+
+@app.get("/reports/weekly", response_class=HTMLResponse)
+def read_weekly_report(request: Request):
+    """Weekly Digest Report view."""
+    now = current_eastern_time().date()
+    start_str, end_str = get_date_bounds_for_week(now)
+    conn = get_connection()
+    try:
+        report = generate_weekly_report(start_str, end_str, conn=conn)
+        return templates.TemplateResponse(request=request, name="weekly.html", context={
+            "active_page": "weekly",
+            "report": report
+        })
+    finally:
+        conn.close()
+
+@app.get("/reports/monthly", response_class=HTMLResponse)
+def read_monthly_report(request: Request):
+    """Monthly Deep-Dive Report view."""
+    now = current_eastern_time()
+    conn = get_connection()
+    try:
+        report = generate_monthly_report(now.year, now.month, conn=conn)
+        return templates.TemplateResponse(request=request, name="monthly.html", context={
+            "active_page": "monthly",
+            "report": report
+        })
+    finally:
+        conn.close()
+
+@app.get("/reports/yearly", response_class=HTMLResponse)
+def read_yearly_report(request: Request):
+    """Yearly Retrospective Report view."""
+    now = current_eastern_time()
+    conn = get_connection()
+    try:
+        report = generate_yearly_report(now.year, conn=conn)
+        return templates.TemplateResponse(request=request, name="yearly.html", context={
+            "active_page": "yearly",
+            "report": report
+        })
+    finally:
+        conn.close()
+
+from decimal import Decimal
+
+@app.get("/transactions", response_class=HTMLResponse)
+def read_transactions(
+    request: Request,
+    category_id: str = Query(default=None),
+    category_name: str = Query(default=None),
+    q: str = Query(default=None)
+):
+    """Full Transactions Explorer view with category filtering, keyword search, and amount search."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+
+        # Parse category_id safely if non-empty integer string
+        cat_id_int = int(category_id) if (category_id and category_id.strip().isdigit()) else None
+
+        # Fetch category list for dropdown filter & inline reassignment
+        cursor.execute("SELECT id, name, group_name FROM categories ORDER BY group_name, name;")
+        all_categories = [dict(row) for row in cursor.fetchall()]
+
+        query = """
+        SELECT t.*, a.name as account_name, c.name as category_name
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        """
+        where_clauses = []
+        params = []
+
+        if cat_id_int is not None:
+            where_clauses.append("t.category_id = ?")
+            params.append(cat_id_int)
+        elif category_name:
+            where_clauses.append("c.name = ?")
+            params.append(category_name)
+
+        if q and q.strip():
+            raw_q = q.strip()
+            kw = f"%{raw_q}%"
+            
+            # Check if q is a numeric monetary value (e.g., "$45.20", "45.20", "-120.50", "3200")
+            clean_num = raw_q.replace("$", "").replace(",", "")
+            amount_search_cents = None
+            try:
+                d = Decimal(clean_num)
+                amount_search_cents = int((d * Decimal(100)).quantize(Decimal("1")))
+            except Exception:
+                amount_search_cents = None
+
+            if amount_search_cents is not None:
+                where_clauses.append("(t.amount_cents = ? OR ABS(t.amount_cents) = ? OR t.description LIKE ? OR t.payee LIKE ? OR t.memo LIKE ? OR c.name LIKE ? OR a.name LIKE ?)")
+                params.extend([amount_search_cents, abs(amount_search_cents), kw, kw, kw, kw, kw])
+            else:
+                where_clauses.append("(t.description LIKE ? OR t.payee LIKE ? OR t.memo LIKE ? OR c.name LIKE ? OR a.name LIKE ?)")
+                params.extend([kw, kw, kw, kw, kw])
+
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
+
+        query += " ORDER BY t.posted_at DESC, t.posted_timestamp DESC;"
+
+        cursor.execute(query, params)
+        transactions = []
+        selected_category = None
+
+        for row in cursor.fetchall():
+            tx_dict = dict(row)
+            tx_dict["formatted_amount"] = format_currency(tx_dict["amount_cents"])
+            transactions.append(tx_dict)
+            if not selected_category and tx_dict["category_name"]:
+                selected_category = tx_dict["category_name"]
+
+        active_filter_label = category_name or selected_category if (cat_id_int or category_name) else None
+
+        return templates.TemplateResponse(request=request, name="transactions.html", context={
+            "active_page": "transactions",
+            "transactions": transactions,
+            "categories": all_categories,
+            "selected_category_id": cat_id_int,
+            "active_filter_label": active_filter_label,
+            "search_query": q.strip() if q else ""
+        })
+    finally:
+        conn.close()
+
+@app.post("/api/transactions/{tx_id}/category")
+def update_transaction_category(tx_id: str, request: Request, category_id: str = Form(default="")):
+    """Reassign category or transfer flag for a transaction."""
+    conn = get_connection()
+    now_str = current_eastern_time().isoformat()
+    try:
+        cursor = conn.cursor()
+        if category_id == "transfer":
+            cursor.execute("""
+            UPDATE transactions 
+            SET category_id = NULL, is_transfer = 1, updated_at = ?
+            WHERE id = ?;
+            """, (now_str, tx_id))
+        elif category_id.isdigit():
+            cursor.execute("""
+            UPDATE transactions 
+            SET category_id = ?, is_transfer = 0, updated_at = ?
+            WHERE id = ?;
+            """, (int(category_id), now_str, tx_id))
+        else:
+            cursor.execute("""
+            UPDATE transactions 
+            SET category_id = NULL, is_transfer = 0, updated_at = ?
+            WHERE id = ?;
+            """, (now_str, tx_id))
+
+        conn.commit()
+        referer = request.headers.get("referer", "/transactions")
+        return RedirectResponse(url=referer, status_code=303)
+    finally:
+        conn.close()
+
+@app.get("/subscriptions", response_class=HTMLResponse)
+def read_subscriptions(request: Request):
+    """Subscriptions & Recurring Bills radar view."""
+    conn = get_connection()
+    try:
+        summary = get_subscriptions_summary(conn=conn)
+        return templates.TemplateResponse(request=request, name="subscriptions.html", context={
+            "active_page": "subscriptions",
+            "summary": summary,
+            "report": summary
+        })
+    finally:
+        conn.close()
+
+@app.get("/investments", response_class=HTMLResponse)
+def read_investments(request: Request):
+    """Investments & Portfolio view."""
+    from app.reports import get_investments_summary
+    conn = get_connection()
+    try:
+        report = get_investments_summary(conn=conn)
+        return templates.TemplateResponse(request=request, name="investments.html", context={
+            "active_page": "investments",
+            "report": report
+        })
+    finally:
+        conn.close()
+
+@app.post("/api/sync")
+def trigger_manual_sync():
+    """Manual sync trigger endpoint."""
+    run_daily_sync()
+    return RedirectResponse(url="/", status_code=303)

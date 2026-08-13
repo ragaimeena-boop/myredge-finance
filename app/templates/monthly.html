@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Monthly Financial Report - Personal Finance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Monthly Deep-Dive Report</h1>
+        <div class="page-subtitle">{{ report.month_name }} • {{ report.start_date }} to {{ report.end_date }}</div>
+    </div>
+</div>
+
+<div class="grid-4">
+    <div class="card">
+        <div class="card-title">Total Monthly Income</div>
+        <div class="hero-number income num">{{ report.formatted_income }}</div>
+        <div class="subtext">All non-transfer deposits</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Total Monthly Expenses</div>
+        <div class="hero-number expense num">{{ report.formatted_expense }}</div>
+        <div class="subtext">All non-transfer spending</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Net Savings</div>
+        <div class="hero-number num {% if report.net_flow_cents >= 0 %}income{% else %}expense{% endif %}">
+            {{ report.formatted_net_flow }}
+        </div>
+        <div class="subtext">Income minus expenses</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Savings Rate</div>
+        <div class="hero-number income num">{{ report.savings_rate_pct }}%</div>
+        <div class="subtext">Percentage of income saved</div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="grid-2" style="margin-bottom: 28px;">
+    <div class="card">
+        <div class="card-title">Interactive Expense Distribution</div>
+        <div style="position: relative; height: 260px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="monthlyCategoryChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-title">Monthly Spending Summary</div>
+        <div class="category-list">
+            {% for cat in report.categories[:4] %}
+            <div class="category-item">
+                <div class="category-meta">
+                    <span class="category-name">{{ cat.name }}</span>
+                    <span class="num">{{ cat.formatted_total }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 28px;">
+    <div class="card-title">Full Category Breakdown</div>
+    <div class="category-list">
+        {% for cat in report.categories %}
+        <div class="category-item">
+            <div class="category-meta">
+                <span class="category-name"><strong>{{ cat.name }}</strong> <span class="subtext">({{ cat.group }})</span></span>
+                <span class="num">{{ cat.formatted_total }} ({{ cat.percentage }}%)</span>
+            </div>
+            <div class="bar-container">
+                <div class="bar-fill" style="width: {{ cat.percentage }}%; background-color: {{ cat.color }};"></div>
+            </div>
+        </div>
+        {% else %}
+        <div class="subtext">No transactions recorded for this month yet.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const ctx = document.getElementById('monthlyCategoryChart').getContext('2d');
+    
+    const categoryLabels = [
+        {% for cat in report.categories %}
+        "{{ cat.name }}"{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    const categoryData = [
+        {% for cat in report.categories %}
+        {{ (cat.total_cents / 100) | round(2) }}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    const categoryColors = [
+        {% for cat in report.categories %}
+        "{{ cat.color }}"{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: categoryLabels,
+            datasets: [{
+                data: categoryData,
+                backgroundColor: categoryColors,
+                borderWidth: 2,
+                borderColor: '#171A21'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { color: '#94A3B8', font: { size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            let value = context.parsed || 0;
+                            return label + ': $' + value.toLocaleString('en-US', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
