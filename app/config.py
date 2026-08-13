@@ -18,9 +18,12 @@ class Settings:
     @property
     def db_path(self) -> Path:
         """Extract path object from sqlite DATABASE_URL."""
-        if self.DATABASE_URL.startswith("sqlite:///"):
-            raw_path = self.DATABASE_URL.replace("sqlite:///", "")
-            return (BASE_DIR / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path)
-        return BASE_DIR / "data" / "finance.db"
+        if "sqlite:///" in self.DATABASE_URL:
+            raw_path = self.DATABASE_URL.split("sqlite:///")[-1]
+            p = Path(raw_path)
+            if not p.is_absolute():
+                p = (BASE_DIR / p).resolve()
+            return p
+        return (BASE_DIR / "data" / "finance.db").resolve()
 
 settings = Settings()
