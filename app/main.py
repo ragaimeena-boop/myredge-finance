@@ -62,18 +62,29 @@ def run_daily_sync():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager: initializes database and starts daily scheduler."""
-    init_db()
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM accounts;")
-    if cursor.fetchone()[0] == 0:
-        run_daily_sync()
-    conn.close()
+    try:
+        init_db()
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM accounts;")
+            if cursor.fetchone()[0] == 0:
+                run_daily_sync()
+        finally:
+            conn.close()
 
-    scheduler.add_job(run_daily_sync, 'cron', hour=6, minute=0, id='daily_simplefin_pull', replace_existing=True)
-    scheduler.start()
+        scheduler.add_job(run_daily_sync, 'cron', hour=6, minute=0, id='daily_simplefin_pull', replace_existing=True)
+        scheduler.start()
+        print("MYREDGE Finance Engine initialized successfully.")
+    except Exception as e:
+        print(f"[STARTUP WARNING] Initialization notice: {e}")
+
     yield
-    scheduler.shutdown()
+
+    try:
+        scheduler.shutdown()
+    except Exception:
+        pass
 
 app = FastAPI(title="Personal Finance Dashboard", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
