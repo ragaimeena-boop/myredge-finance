@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database import get_connection, init_db
+from app.auth import create_user, create_session
 from app.stock_market import (
     get_live_market_indices,
     get_top_market_movers,
@@ -89,7 +90,15 @@ def test_get_ticker_ai_deep_dive():
         conn.close()
 
 def test_stock_market_web_routes():
+    conn = get_connection()
+    try:
+        user = create_user("test_admin", "TestPass123!", conn=conn)
+        token = create_session(user["id"], conn=conn)
+    finally:
+        conn.close()
+
     client = TestClient(app)
+    client.cookies.set("myredge_session", token)
     
     # Test GET /stock-market
     res = client.get("/stock-market")

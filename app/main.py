@@ -112,18 +112,20 @@ async def auth_middleware(request: Request, call_next):
     conn = get_connection()
     try:
         user_cnt = get_user_count(conn=conn)
-        if user_cnt > 0:
-            session_token = request.cookies.get("myredge_session")
-            if not session_token:
-                return RedirectResponse(url="/login", status_code=303)
+        if user_cnt == 0:
+            return RedirectResponse(url="/setup-admin", status_code=303)
 
-            user, is_timed_out = validate_session(session_token, conn=conn)
-            if is_timed_out:
-                return RedirectResponse(url="/login?timeout=1", status_code=303)
-            if not user:
-                return RedirectResponse(url="/login", status_code=303)
+        session_token = request.cookies.get("myredge_session")
+        if not session_token:
+            return RedirectResponse(url="/login", status_code=303)
 
-            request.state.user = user
+        user, is_timed_out = validate_session(session_token, conn=conn)
+        if is_timed_out:
+            return RedirectResponse(url="/login?timeout=1", status_code=303)
+        if not user:
+            return RedirectResponse(url="/login", status_code=303)
+
+        request.state.user = user
     finally:
         conn.close()
 

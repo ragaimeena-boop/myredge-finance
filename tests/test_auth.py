@@ -59,9 +59,10 @@ def test_create_and_validate_session():
 def test_auth_routes_and_middleware():
     client = TestClient(app)
     
-    # 1. Unconfigured initial state (0 users in DB): GET / returns 200 OK
+    # 1. Unconfigured initial state (0 users in DB): GET / redirects to /setup-admin!
     res = client.get("/", follow_redirects=False)
-    assert res.status_code == 200
+    assert res.status_code == 303
+    assert res.headers["location"] == "/setup-admin"
 
     # 2. Test Setup Admin page
     res_setup_page = client.get("/setup-admin")

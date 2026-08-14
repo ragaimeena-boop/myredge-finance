@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.database import init_db, get_connection
 from app.simplefin import clean_merchant_description, infer_account_type
+from app.auth import create_user, create_session
 
 def test_clean_merchant_description():
     assert clean_merchant_description("TST* CHIPOTLE MEXICAN GRILL MIAMI FL") == "CHIPOTLE MEXICAN GRILL"
@@ -23,17 +24,22 @@ def test_accounts_page_and_type_update(tmp_path, monkeypatch):
     init_db()
 
     conn = get_connection()
-    cursor = conn.cursor()
-    
-    # Check new categories exist
-    cursor.execute("SELECT name FROM categories WHERE name IN ('Data/Tele', 'Demetrius Income', 'Travel');")
-    cats = {r[0] for r in cursor.fetchall()}
-    assert "Data/Tele" in cats
-    assert "Demetrius Income" in cats
-    assert "Travel" in cats
+    try:
+        user = create_user("test_admin", "TestPass123!", conn=conn)
+        token = create_session(user["id"], conn=conn)
+        cursor = conn.cursor()
+        
+        # Check new categories exist
+        cursor.execute("SELECT name FROM categories WHERE name IN ('Data/Tele', 'Demetrius Income', 'Travel');")
+        cats = {r[0] for r in cursor.fetchall()}
+        assert "Data/Tele" in cats
+        assert "Demetrius Income" in cats
+        assert "Travel" in cats
 
-    # Check account_type column exists and accounts route renders
-    with TestClient(app) as client:
+        client = TestClient(app)
+        client.cookies.set("myredge_session", token)
+
+        # Check account_type column exists and accounts route renders
         res = client.get("/accounts")
         assert res.status_code == 200
         assert "Accounts & Institutions" in res.text
@@ -49,5 +55,5 @@ def test_accounts_page_and_type_update(tmp_path, monkeypatch):
             
             cursor.execute("SELECT account_type FROM accounts WHERE id = ?;", (acc_id,))
             assert cursor.fetchone()[0] == "investment"
-    
-    conn.close()
+    finally:
+        conn.close()
