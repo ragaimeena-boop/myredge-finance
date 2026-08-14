@@ -265,6 +265,7 @@ def init_db():
         # Transfers & Financial
         ("Credit Card Payment", "Transfers", "credit-card", "#64748B", 0, 1),
         ("Internal Transfer", "Transfers", "repeat", "#94A3B8", 0, 1),
+        ("Investment Transfer", "Transfers", "trending-up", "#60A5FA", 0, 1),
         ("Uncategorized", "Other", "help-circle", "#64748B", 0, 0),
     ]
 
@@ -286,6 +287,16 @@ def init_db():
         ("ZELLE", "Internal Transfer", None, 1),
         ("VENMO", "Internal Transfer", None, 1),
         ("PAYPAL", "Internal Transfer", None, 1),
+        ("BETTERMENT", "Investment Transfer", "Betterment", 1),
+        ("SCHWAB", "Investment Transfer", "Charles Schwab", 1),
+        ("BUILDWEALTH", "Investment Transfer", "Buildwealth", 1),
+        ("FIDELITY", "Investment Transfer", "Fidelity Investments", 1),
+        ("VANGUARD", "Investment Transfer", "Vanguard", 1),
+        ("E*TRADE", "Investment Transfer", "E*Trade", 1),
+        ("ETRADE", "Investment Transfer", "E*Trade", 1),
+        ("ROBINHOOD", "Investment Transfer", "Robinhood", 1),
+        ("TD AMERITRADE", "Investment Transfer", "TD Ameritrade", 1),
+        ("WEBULL", "Investment Transfer", "Webull", 1),
 
         # Income
         ("DEMETRIUS", "Demetrius Income", None, 0),
@@ -293,11 +304,7 @@ def init_db():
         ("DIRECT DEPOSIT", "Salary & Wages", None, 0),
         ("PAYROLL", "Salary & Wages", None, 0),
         ("DIVIDEND", "Investments & Interest", None, 0),
-        ("SCHWAB", "Investments & Interest", "Charles Schwab", 0),
-        ("BETTERMENT", "Investments & Interest", "Betterment", 0),
-        ("BUILDWEALTH", "Investments & Interest", "Buildwealth", 0),
-        ("FIDELITY", "Investments & Interest", "Fidelity Investments", 0),
-        ("VANGUARD", "Investments & Interest", "Vanguard", 0),
+        ("INTEREST", "Investments & Interest", None, 0),
 
         # Data / Tele
         ("AT&T", "Data/Tele", "AT&T", 0),
@@ -407,6 +414,37 @@ def init_db():
             """, (pattern, row["id"], clean_payee, is_trans))
 
     conn.commit()
+
+    # Migration: Update existing investment rules and transactions to Investment Transfer (is_transfer = 1)
+    cursor.execute("SELECT id FROM categories WHERE name = 'Investment Transfer';")
+    inv_cat_row = cursor.fetchone()
+    if inv_cat_row:
+        inv_cat_id = inv_cat_row["id"]
+        # Update rules for investment institutions
+        cursor.execute("""
+        UPDATE rules
+        SET category_id = ?, is_transfer = 1
+        WHERE pattern IN ('BETTERMENT', 'SCHWAB', 'BUILDWEALTH', 'FIDELITY', 'VANGUARD', 'E*TRADE', 'ETRADE', 'ROBINHOOD', 'TD AMERITRADE', 'WEBULL');
+        """, (inv_cat_id,))
+
+        # Update existing transactions matching investment payees/descriptions
+        cursor.execute("""
+        UPDATE transactions
+        SET category_id = ?, is_transfer = 1
+        WHERE (
+            UPPER(description) LIKE '%BETTERMENT%' OR UPPER(payee) LIKE '%BETTERMENT%' OR
+            UPPER(description) LIKE '%SCHWAB%' OR UPPER(payee) LIKE '%SCHWAB%' OR
+            UPPER(description) LIKE '%BUILDWEALTH%' OR UPPER(payee) LIKE '%BUILDWEALTH%' OR
+            UPPER(description) LIKE '%FIDELITY%' OR UPPER(payee) LIKE '%FIDELITY%' OR
+            UPPER(description) LIKE '%VANGUARD%' OR UPPER(payee) LIKE '%VANGUARD%' OR
+            UPPER(description) LIKE '%E*TRADE%' OR UPPER(payee) LIKE '%E*TRADE%' OR
+            UPPER(description) LIKE '%ROBINHOOD%' OR UPPER(payee) LIKE '%ROBINHOOD%' OR
+            UPPER(description) LIKE '%WEBULL%' OR UPPER(payee) LIKE '%WEBULL%'
+        )
+        AND UPPER(description) NOT LIKE '%DIVIDEND%' AND UPPER(payee) NOT LIKE '%DIVIDEND%'
+        AND UPPER(description) NOT LIKE '%INTEREST%' AND UPPER(payee) NOT LIKE '%INTEREST%';
+        """, (inv_cat_id,))
+        conn.commit()
 
     # Re-apply rules against any existing Uncategorized transactions
     from app.simplefin import reapply_rules_to_uncategorized
