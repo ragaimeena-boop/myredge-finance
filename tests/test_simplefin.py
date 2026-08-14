@@ -95,3 +95,23 @@ def test_reapply_rules_to_uncategorized(test_db):
     row = cursor.fetchone()
     assert row["name"] == "Groceries"
 
+def test_robust_categorization_engine(test_db):
+    from app.simplefin import apply_categorization_rules
+
+    # Test IRS/Taxes matching
+    cat_id_tax, payee_tax, is_trans_tax = apply_categorization_rules(test_db, "ACH WITHDRAWAL IRS DES:US TREAS TAX REF ID:99203", "IRS")
+    cursor = test_db.cursor()
+    cursor.execute("SELECT name FROM categories WHERE id = ?;", (cat_id_tax,))
+    assert cursor.fetchone()["name"] == "IRS/Taxes"
+
+    # Test Office matching
+    cat_id_off, payee_off, _ = apply_categorization_rules(test_db, "STAPLES #0482 MIAMI FL", "Staples")
+    cursor.execute("SELECT name FROM categories WHERE id = ?;", (cat_id_off,))
+    assert cursor.fetchone()["name"] == "Office"
+
+    # Test Entertainment matching
+    cat_id_ent, payee_ent, _ = apply_categorization_rules(test_db, "SQ *CINEMARK THEATRES #381", "Cinemark")
+    cursor.execute("SELECT name FROM categories WHERE id = ?;", (cat_id_ent,))
+    assert cursor.fetchone()["name"] == "Entertainment"
+
+

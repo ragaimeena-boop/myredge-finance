@@ -259,8 +259,11 @@ def init_db():
         ("Shopping & Retail", "Lifestyle", "shopping-cart", "#EC4899", 0, 0),
         ("Travel", "Lifestyle", "plane", "#38BDF8", 0, 0),
         ("Subscriptions & Recurring", "Lifestyle", "repeat", "#F472B6", 0, 0),
+        ("Entertainment", "Lifestyle", "tv", "#F43F5E", 0, 0),
         ("Medical & Healthcare", "Healthcare", "heart", "#06B6D4", 0, 0),
         ("Legal & Professional", "Services", "file-text", "#A855F7", 0, 0),
+        ("Office", "Services", "briefcase", "#8B5CF6", 0, 0),
+        ("IRS/Taxes", "Services", "file-text", "#EF4444", 0, 0),
 
         # Transfers & Financial
         ("Credit Card Payment", "Transfers", "credit-card", "#64748B", 0, 1),
@@ -277,6 +280,47 @@ def init_db():
 
     # Seed Default Categorization Rules (INSERT OR IGNORE ensures missing rules are safely added to existing DBs)
     default_rules = [
+        # Office
+        ("STAPLES", "Office", "Staples", 0),
+        ("OFFICE DEPOT", "Office", "Office Depot", 0),
+        ("OFFICEMAX", "Office", "OfficeMax", 0),
+        ("FEDEX OFFICE", "Office", "FedEx Office", 0),
+        ("UPS STORE", "Office", "The UPS Store", 0),
+        ("OFFICE", "Office", None, 0),
+
+        # IRS / Taxes
+        ("IRS", "IRS/Taxes", "Internal Revenue Service", 0),
+        ("US TREASURY", "IRS/Taxes", "US Treasury", 0),
+        ("US TREAS", "IRS/Taxes", "US Treasury", 0),
+        ("INTERNAL REVENUE", "IRS/Taxes", "Internal Revenue Service", 0),
+        ("TURBOTAX", "IRS/Taxes", "TurboTax", 0),
+        ("H&R BLOCK", "IRS/Taxes", "H&R Block", 0),
+        ("TAXACT", "IRS/Taxes", "TaxAct", 0),
+        ("TAX COLLECTOR", "IRS/Taxes", "Tax Collector", 0),
+        ("PROPERTY TAX", "IRS/Taxes", "Property Tax", 0),
+
+        # Entertainment
+        ("AMC", "Entertainment", "AMC Theatres", 0),
+        ("REGAL", "Entertainment", "Regal Cinemas", 0),
+        ("CINEMARK", "Entertainment", "Cinemark", 0),
+        ("THEATRE", "Entertainment", None, 0),
+        ("CINEMA", "Entertainment", None, 0),
+        ("STEAM", "Entertainment", "Steam Gaming", 0),
+        ("PLAYSTATION", "Entertainment", "PlayStation Network", 0),
+        ("XBOX", "Entertainment", "Xbox Live", 0),
+        ("NINTENDO", "Entertainment", "Nintendo eShop", 0),
+        ("TICKETMASTER", "Entertainment", "Ticketmaster", 0),
+        ("EVENTBRITE", "Entertainment", "Eventbrite", 0),
+        ("STUBHUB", "Entertainment", "StubHub", 0),
+        ("CONCERT", "Entertainment", None, 0),
+        ("ENTERTAINMENT", "Entertainment", None, 0),
+        ("GOLF", "Entertainment", None, 0),
+        ("BOWLING", "Entertainment", None, 0),
+        ("MUSEUM", "Entertainment", None, 0),
+        ("DISNEYLAND", "Entertainment", "Disneyland", 0),
+        ("DISNEY WORLD", "Entertainment", "Walt Disney World", 0),
+        ("UNIVERSAL STUDIOS", "Entertainment", "Universal Studios", 0),
+
         # Transfers & Credit Cards
         ("CREDIT CARD", "Credit Card Payment", None, 1),
         ("PAYMENT THANK YOU", "Credit Card Payment", None, 1),

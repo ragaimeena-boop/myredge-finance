@@ -76,9 +76,35 @@ def infer_account_type(name: str, org_name: str = "") -> str:
         return "savings"
     return "checking"
 
+HEURISTIC_KEYWORDS = [
+    # Taxes
+    (["IRS", "US TREAS", "TREASURY", "INTERNAL REVENUE", "TAX PAY", "PROPERTY TAX", "TAX COLLECTOR", "STATE TAX", "TURBOTAX", "H&R BLOCK", "TAXACT"], "IRS/Taxes", 0),
+    
+    # Office
+    (["STAPLES", "OFFICE DEPOT", "OFFICEMAX", "FEDEX OFFICE", "UPS STORE", "PAPER", "INK", "DESK", "WORKPLACE"], "Office", 0),
+    
+    # Entertainment
+    (["CINEMA", "THEATER", "THEATRE", "MOVIE", "STREAM", "PLAYSTATION", "XBOX", "NINTENDO", "GAME", "STEAM", "TICKETMASTER", "EVENTBRITE", "STUBHUB", "GOLF", "BOWLING", "MUSEUM", "DISNEY", "UNIVERSAL"], "Entertainment", 0),
+    
+    # Medical & Healthcare
+    (["CVS", "WALGREENS", "RITE AID", "PHARMACY", "CLINIC", "HOSPITAL", "DOCTOR", "DENTAL", "DENTIST", "QUEST DIAGNOSTICS", "LABCORP", "OPTICAL", "VISION", "HEALTHCARE"], "Medical & Healthcare", 0),
+    
+    # Restaurants & Dining
+    (["CAFE", "BISTRO", "GRILL", "DINER", "BURGER", "PIZZA", "SUSHI", "TACO", "BAKERY", "BAR", "PUB", "RESTAURANT", "KITCHEN"], "Restaurants & Dining", 0),
+    
+    # Groceries
+    (["MARKET", "GROCERY", "SUPERMARKET", "WHOLE FOODS", "TRADER JOE", "PUBLIX", "COSTCO", "ALDI", "KROGER"], "Groceries", 0),
+    
+    # Fuel
+    (["GAS", "OIL", "FUEL", "CHEVRON", "SHELL", "EXXON", "MOBIL", "BP", "WAWA", "SPEEDWAY", "VALERO"], "Fuel & Gas", 0),
+    
+    # Transfers
+    (["ATM WITHDRAWAL", "CASH WITHDRAWAL", "WIRE TRANSFER", "ACH TRANSFER", "ZELLE", "VENMO", "PAYPAL"], "Internal Transfer", 1),
+]
+
 def apply_categorization_rules(conn, description: str, payee: str) -> Tuple[int | None, str | None, int]:
     """
-    Match transaction description/payee against database rules using multi-tier intelligence.
+    Match transaction description/payee against database rules using 4-tier robust intelligence engine.
     Returns (category_id, clean_payee, is_transfer).
     """
     cursor = conn.cursor()
@@ -87,23 +113,52 @@ def apply_categorization_rules(conn, description: str, payee: str) -> Tuple[int 
 
     raw_desc = (description or "").upper()
     raw_payee = (payee or "").upper()
+    combined_text = f"{raw_desc} {raw_payee}"
     clean_merchant = clean_merchant_description(description, payee)
 
-    # Tier 1: Substring / Token Match in clean merchant or raw text
+    # Tier 1: Exact Substring / Token Match against database rules
     for rule in rules:
         pattern = rule["pattern"].upper()
         if pattern in clean_merchant or pattern in raw_desc or pattern in raw_payee:
             final_payee = rule["clean_payee"] if rule["clean_payee"] else (payee or clean_merchant.title())
             return rule["category_id"], final_payee, rule["is_transfer"]
 
-    # Tier 2: Fuzzy similarity match against rule pattern keywords
+    # Tier 2: Word Boundary / Regex Token Match
+    for rule in rules:
+        pattern = rule["pattern"].upper()
+        if len(pattern) >= 3 and re.search(r'\b' + re.escape(pattern) + r'\b', combined_text):
+            final_payee = rule["clean_payee"] if rule["clean_payee"] else (payee or clean_merchant.title())
+            return rule["category_id"], final_payee, rule["is_transfer"]
+
+    # Tier 3: Heuristic Domain Keyword Fallback Engine
+    for keywords, category_name, is_transfer in HEURISTIC_KEYWORDS:
+        for kw in keywords:
+            if kw in combined_text or kw in clean_merchant:
+                cursor.execute("SELECT id, is_transfer FROM categories WHERE name = ?;", (category_name,))
+                cat_row = cursor.fetchone()
+                if cat_row:
+                    cat_id = cat_row["id"]
+                    cat_is_trans = cat_row["is_transfer"] if cat_row["is_transfer"] is not None else is_transfer
+                    final_payee = payee or clean_merchant.title()
+                    # Auto-persist rule so future syncs match in Tier 1 instantly
+                    try:
+                        cursor.execute("""
+                        INSERT OR IGNORE INTO rules (pattern, category_id, clean_payee, is_transfer, priority)
+                        VALUES (?, ?, ?, ?, 5);
+                        """, (kw, cat_id, final_payee, cat_is_trans))
+                        conn.commit()
+                    except Exception:
+                        pass
+                    return cat_id, final_payee, cat_is_trans
+
+    # Tier 4: Fuzzy Similarity Match against rule pattern keywords
     best_match = None
     highest_score = 0.0
     for rule in rules:
         pattern = rule["pattern"].upper()
         if len(pattern) >= 4 and len(clean_merchant) >= 4:
             ratio = SequenceMatcher(None, pattern, clean_merchant).ratio()
-            if ratio >= 0.82 and ratio > highest_score:
+            if ratio >= 0.80 and ratio > highest_score:
                 highest_score = ratio
                 best_match = rule
 
