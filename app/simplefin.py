@@ -147,7 +147,7 @@ def apply_categorization_rules(conn, description: str, payee: str) -> Tuple[int 
     # Tier 3: Heuristic Domain Keyword Fallback Engine
     for keywords, category_name, is_transfer in HEURISTIC_KEYWORDS:
         for kw in keywords:
-            if kw in combined_text or kw in clean_merchant:
+            if re.search(r'\b' + re.escape(kw) + r'\b', combined_text) or re.search(r'\b' + re.escape(kw) + r'\b', clean_merchant):
                 cursor.execute("SELECT id, is_transfer FROM categories WHERE name = ?;", (category_name,))
                 cat_row = cursor.fetchone()
                 if cat_row:
@@ -186,11 +186,11 @@ def apply_categorization_rules(conn, description: str, payee: str) -> Tuple[int 
     cat_id = row["id"] if row else None
     return cat_id, (payee or clean_merchant.title() or "Unknown Merchant"), 0
 
-def reapply_rules_to_uncategorized(conn=None) -> int:
+def reapply_rules_to_uncategorized(conn=None, force_all: bool = False) -> int:
     """
-    Re-evaluate categorization rules against all currently Uncategorized transactions.
-    Preserves user manual category assignments.
-    Returns count of transactions categorized.
+    Re-evaluate categorization rules against Uncategorized transactions (or ALL transactions if force_all=True).
+    Preserves user manual category assignments when force_all=False.
+    Returns count of transactions categorized or updated.
     """
     close_conn = False
     if conn is None:
@@ -205,18 +205,25 @@ def reapply_rules_to_uncategorized(conn=None) -> int:
         row = cursor.fetchone()
         uncat_id = row["id"] if row else None
 
-        cursor.execute("""
-        SELECT id, description, payee 
-        FROM transactions 
-        WHERE (category_id = ? OR category_id IS NULL) AND is_transfer = 0;
-        """, (uncat_id,))
-        txs = cursor.fetchall()
+        if force_all:
+            cursor.execute("""
+            SELECT id, description, payee 
+            FROM transactions 
+            WHERE is_transfer = 0;
+            """)
+        else:
+            cursor.execute("""
+            SELECT id, description, payee 
+            FROM transactions 
+            WHERE (category_id = ? OR category_id IS NULL) AND is_transfer = 0;
+            """, (uncat_id,))
 
+        txs = cursor.fetchall()
         now_str = current_eastern_time().isoformat()
 
         for tx in txs:
             cat_id, clean_payee, is_transfer = apply_categorization_rules(conn, tx["description"], tx["payee"])
-            if cat_id is not None and cat_id != uncat_id:
+            if cat_id is not None and (force_all or cat_id != uncat_id):
                 cursor.execute("""
                 UPDATE transactions
                 SET category_id = ?, payee = ?, is_transfer = ?, updated_at = ?
@@ -230,6 +237,130 @@ def reapply_rules_to_uncategorized(conn=None) -> int:
             conn.close()
 
     return categorized_count
+
+def ai_autocategorize_transactions(conn=None, force_all: bool = False) -> int:
+    """
+    Use Gemini AI API to analyze and auto-categorize bank transactions.
+    Auto-persists learned rules into SQLite database and updates transaction records.
+    """
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name FROM categories ORDER BY id ASC;")
+        cat_rows = cursor.fetchall()
+        categories_map = {row["name"].upper(): row["id"] for row in cat_rows}
+        categories_list = [row["name"] for row in cat_rows]
+
+        cursor.execute("SELECT id FROM categories WHERE name = 'Uncategorized';")
+        uncat_row = cursor.fetchone()
+        uncat_id = uncat_row["id"] if uncat_row else None
+
+        if force_all:
+            cursor.execute("""
+            SELECT id, description, payee, amount_cents 
+            FROM transactions 
+            WHERE is_transfer = 0;
+            """)
+        else:
+            cursor.execute("""
+            SELECT id, description, payee, amount_cents 
+            FROM transactions 
+            WHERE (category_id = ? OR category_id IS NULL) AND is_transfer = 0;
+            """, (uncat_id,))
+            
+        txs = cursor.fetchall()
+        if not txs:
+            return 0
+
+        api_key = os.getenv("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", "")
+
+        tx_items = []
+        for tx in txs:
+            tx_items.append({
+                "id": str(tx["id"]),
+                "description": tx["description"] or "",
+                "payee": tx["payee"] or "",
+                "amount": str(tx["amount_cents"] / 100.0)
+            })
+
+        ai_results = []
+        if api_key:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+            prompt = f"""
+            You are an expert personal finance transaction classifier.
+            Classify each bank transaction into EXACTLY ONE category from this allowed list:
+            {json.dumps(categories_list)}
+
+            Important domain hints:
+            - UF Health, Hospitals, Clinics, Doctors, Dental, CVS, Walgreens -> "Medical & Healthcare"
+            - Tag Asmt, FL License, DMV, Vehicle registration, Auto Repair, Geico -> "Auto Payment & Insurance"
+            - State of Florida Dept Revenue, IRS, Tax Collector, US Treasury -> "IRS/Taxes"
+            - Collegeboard, SAT, ACT, University, Tuition, Schools -> "Education & Learning"
+            - Circle K, Wawa, Speedway, Chevron, Shell -> "Fuel & Gas"
+            - Neverland, AMC, Steam, PlayStation, Resorts, Theme Parks -> "Entertainment"
+            - Staples, Office Depot, FedEx Office -> "Office"
+            - Fawry, Leather, Retail stores -> "Shopping & Retail"
+            - Raghaeb Res Management, Rent, Mortgage -> "Mortgage & Rent"
+
+            Input transactions:
+            {json.dumps(tx_items[:50])}
+
+            Return ONLY valid JSON array with objects matching:
+            [
+              {{
+                "id": "transaction_id",
+                "category_name": "Exact Category Name",
+                "clean_payee": "Clean Human Payee Name",
+                "is_transfer": 0
+              }}
+            ]
+            """
+            try:
+                res = httpx.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=25.0)
+                if res.status_code == 200:
+                    resp_json = res.json()
+                    text_content = resp_json['candidates'][0]['content']['parts'][0]['text']
+                    clean_json_str = re.sub(r"```json|```", "", text_content).strip()
+                    ai_results = json.loads(clean_json_str)
+            except Exception as e:
+                print(f"[AI CATEGORIZATION WARNING] Gemini API call fallback: {e}")
+
+        now_str = current_eastern_time().isoformat()
+        updated_count = 0
+
+        for item in (ai_results if ai_results else []):
+            tx_id = item.get("id")
+            cat_name = item.get("category_name", "").strip()
+            clean_payee = item.get("clean_payee", "").strip()
+            is_trans = 1 if item.get("is_transfer") else 0
+
+            cat_id = categories_map.get(cat_name.upper())
+            if tx_id and cat_id:
+                cursor.execute("""
+                UPDATE transactions
+                SET category_id = ?, payee = ?, is_transfer = ?, updated_at = ?
+                WHERE id = ?;
+                """, (cat_id, clean_payee, is_trans, now_str, tx_id))
+                updated_count += 1
+
+                if clean_payee and len(clean_payee) >= 3:
+                    cursor.execute("""
+                    INSERT OR IGNORE INTO rules (pattern, category_id, clean_payee, is_transfer, priority)
+                    VALUES (?, ?, ?, ?, 15);
+                    """, (clean_payee.upper(), cat_id, clean_payee, is_trans))
+
+        # Fallback heuristic pass
+        heuristic_count = reapply_rules_to_uncategorized(conn=conn, force_all=force_all)
+        conn.commit()
+
+        return updated_count + heuristic_count
+    finally:
+        if close_conn:
+            conn.close()
 
 def ingest_simplefin_data(data: SimpleFINResponse, conn=None) -> Dict[str, int]:
     """

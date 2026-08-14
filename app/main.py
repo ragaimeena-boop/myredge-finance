@@ -373,11 +373,22 @@ def update_transaction_category(tx_id: str, request: Request, category_id: str =
 
 @app.post("/api/transactions/recategorize")
 def trigger_recategorize_uncategorized():
-    """Run rule engine across all uncategorized transactions."""
+    """Run rule engine across all transactions (force_all=True)."""
     from app.simplefin import reapply_rules_to_uncategorized
     conn = get_connection()
     try:
-        count = reapply_rules_to_uncategorized(conn=conn)
+        count = reapply_rules_to_uncategorized(conn=conn, force_all=True)
+    finally:
+        conn.close()
+    return RedirectResponse(url=f"/transactions?categorized_count={count}", status_code=303)
+
+@app.post("/api/transactions/ai-categorize")
+def trigger_ai_categorize():
+    """Run Gemini AI Auto-Categorizer across transactions."""
+    from app.simplefin import ai_autocategorize_transactions
+    conn = get_connection()
+    try:
+        count = ai_autocategorize_transactions(conn=conn, force_all=True)
     finally:
         conn.close()
     return RedirectResponse(url=f"/transactions?categorized_count={count}", status_code=303)

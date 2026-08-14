@@ -319,11 +319,25 @@ def init_db():
         ("TAX COLLECTOR", "IRS/Taxes", "Tax Collector", 0),
         ("PROPERTY TAX", "IRS/Taxes", "Property Tax", 0),
 
+        # Medical & Healthcare
+        ("UF HEALTH", "Medical & Healthcare", "UF Health", 0),
+        ("UFHEALTH", "Medical & Healthcare", "UF Health", 0),
+        ("LEESBURG", "Medical & Healthcare", "UF Health Leesburg", 0),
+        ("HOSPITAL", "Medical & Healthcare", None, 0),
+        ("CLINIC", "Medical & Healthcare", None, 0),
+        ("DOCTOR", "Medical & Healthcare", None, 0),
+
         # Auto & Transportation
+        ("TAG ASMT", "Auto Payment & Insurance", "FL License Tag", 0),
+        ("FL LICENSE", "Auto Payment & Insurance", "FL License Tag", 0),
         ("TYREPRO", "Auto Payment & Insurance", "Tyrepro", 0),
         ("TYRE", "Auto Payment & Insurance", None, 0),
         ("TIRE", "Auto Payment & Insurance", None, 0),
         ("AUTO REPAIR", "Auto Payment & Insurance", None, 0),
+
+        # Fuel & Gas
+        ("CIRCLE K", "Fuel & Gas", "Circle K", 0),
+        ("CIRCLEK", "Fuel & Gas", "Circle K", 0),
 
         # Housing & Rent Management
         ("RES MANAGEMENT", "Mortgage & Rent", "Residential Management", 0),
