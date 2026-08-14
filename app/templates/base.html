@@ -94,6 +94,18 @@
                     <span class="nav-icon">📈</span> <span class="nav-text">Stock Market</span>
                 </a>
             </li>
+            <li>
+                <a href="/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}">
+                    <span class="nav-icon">⚙️</span> <span class="nav-text">Settings</span>
+                </a>
+            </li>
+            <li>
+                <form action="/api/logout" method="POST" style="margin: 0;">
+                    <button type="submit" class="nav-link" style="width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit;">
+                        <span class="nav-icon">🚪</span> <span class="nav-text">Sign Out</span>
+                    </button>
+                </form>
+            </li>
         </ul>
     </div>
 
@@ -160,6 +172,18 @@
                 <a href="/stock-market" class="nav-link {% if active_page == 'stock_market' %}active{% endif %}" title="Stock Market">
                     <span class="nav-icon">📈</span> <span class="nav-text">Stock Market</span>
                 </a>
+            </li>
+            <li>
+                <a href="/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}" title="Settings">
+                    <span class="nav-icon">⚙️</span> <span class="nav-text">Settings</span>
+                </a>
+            </li>
+            <li style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
+                <form action="/api/logout" method="POST" style="margin: 0;">
+                    <button type="submit" class="nav-link" style="width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit;" title="Sign Out">
+                        <span class="nav-icon">🚪</span> <span class="nav-text">Sign Out</span>
+                    </button>
+                </form>
             </li>
             </ul>
         </aside>

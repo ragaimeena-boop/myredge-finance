@@ -23,6 +23,12 @@ from app.reports import (
     get_credit_score_summary,
     get_date_bounds_for_week
 )
+from app.auth import (
+    get_user_count, create_user, get_user_by_username, get_user_by_id,
+    verify_password, create_session, validate_session, revoke_session,
+    get_totp_qr_data_url, verify_totp_code, get_user_settings,
+    update_session_timeout, update_user_credentials, update_user_totp_secret
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 scheduler = BackgroundScheduler(timezone=pytz.timezone(settings.TIMEZONE))
@@ -91,6 +97,38 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Personal Finance Dashboard", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    exempt_prefixes = [
+        "/static", "/favicon.ico", "/manifest.json", "/sw.js",
+        "/login", "/api/login", "/verify-otp", "/api/verify-otp",
+        "/setup-admin", "/api/setup-admin"
+    ]
+    if any(path.startswith(prefix) for prefix in exempt_prefixes):
+        return await call_next(request)
+
+    conn = get_connection()
+    try:
+        user_cnt = get_user_count(conn=conn)
+        if user_cnt > 0:
+            session_token = request.cookies.get("myredge_session")
+            if not session_token:
+                return RedirectResponse(url="/login", status_code=303)
+
+            user, is_timed_out = validate_session(session_token, conn=conn)
+            if is_timed_out:
+                return RedirectResponse(url="/login?timeout=1", status_code=303)
+            if not user:
+                return RedirectResponse(url="/login", status_code=303)
+
+            request.state.user = user
+    finally:
+        conn.close()
+
+    response = await call_next(request)
+    return response
 
 @app.get("/manifest.json", include_in_schema=False)
 def get_manifest():
@@ -516,6 +554,256 @@ def get_ticker_analysis(ticker: str):
         return get_ticker_ai_deep_dive(ticker, conn=conn)
     finally:
         conn.close()
+
+# --- Authentication & Settings Endpoints ---
+
+@app.get("/setup-admin", response_class=HTMLResponse)
+def get_setup_admin(request: Request):
+    """Initial admin master account setup view."""
+    conn = get_connection()
+    try:
+        if get_user_count(conn=conn) > 0:
+            return RedirectResponse(url="/login", status_code=303)
+        return templates.TemplateResponse(request=request, name="setup_admin.html", context={"error": None})
+    finally:
+        conn.close()
+
+@app.post("/api/setup-admin")
+def post_setup_admin(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...)
+):
+    """Create initial admin master account."""
+    conn = get_connection()
+    try:
+        if get_user_count(conn=conn) > 0:
+            return RedirectResponse(url="/login", status_code=303)
+
+        if password != confirm_password:
+            return templates.TemplateResponse(request=request, name="setup_admin.html", context={"error": "Passwords do not match."})
+
+        if len(password) < 6:
+            return templates.TemplateResponse(request=request, name="setup_admin.html", context={"error": "Password must be at least 6 characters."})
+
+        user = create_user(username=username, password=password, conn=conn)
+        token = create_session(user["id"], conn=conn)
+        
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(key="myredge_session", value=token, httponly=True, samesite="lax")
+        return response
+    finally:
+        conn.close()
+
+@app.get("/login", response_class=HTMLResponse)
+def get_login(request: Request):
+    """Login landing page view."""
+    conn = get_connection()
+    try:
+        timeout = request.query_params.get("timeout")
+        logged_out = request.query_params.get("logged_out")
+        error = request.query_params.get("error")
+
+        return templates.TemplateResponse(request=request, name="login.html", context={
+            "timeout": timeout,
+            "logged_out": logged_out,
+            "error": error
+        })
+    finally:
+        conn.close()
+
+@app.post("/api/login")
+def post_login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...)
+):
+    """Verify credentials and grant session or prompt 2FA."""
+    conn = get_connection()
+    try:
+        user = get_user_by_username(username, conn=conn)
+        if not user or not verify_password(password, user["password_hash"]):
+            return templates.TemplateResponse(request=request, name="login.html", context={
+                "error": "Invalid username or password."
+            })
+
+        # Check if 2FA TOTP is enabled for this user
+        if user.get("is_totp_enabled"):
+            temp_token = create_session(user["id"], conn=conn)
+            response = RedirectResponse(url="/verify-otp", status_code=303)
+            response.set_cookie(key="myredge_2fa_pending", value=temp_token, httponly=True, samesite="lax")
+            return response
+
+        token = create_session(user["id"], conn=conn)
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(key="myredge_session", value=token, httponly=True, samesite="lax")
+        return response
+    finally:
+        conn.close()
+
+@app.get("/verify-otp", response_class=HTMLResponse)
+def get_verify_otp(request: Request):
+    """2FA OTP challenge view."""
+    pending_token = request.cookies.get("myredge_2fa_pending")
+    if not pending_token:
+        return RedirectResponse(url="/login", status_code=303)
+
+    return templates.TemplateResponse(request=request, name="verify_otp.html", context={"error": None})
+
+@app.post("/api/verify-otp")
+def post_verify_otp(
+    request: Request,
+    otp_code: str = Form(...)
+):
+    """Verify 6-digit TOTP code and grant session."""
+    pending_token = request.cookies.get("myredge_2fa_pending")
+    if not pending_token:
+        return RedirectResponse(url="/login", status_code=303)
+
+    conn = get_connection()
+    try:
+        user, _ = validate_session(pending_token, conn=conn)
+        if not user:
+            return RedirectResponse(url="/login", status_code=303)
+
+        if not verify_totp_code(user["totp_secret"], otp_code):
+            return templates.TemplateResponse(request=request, name="verify_otp.html", context={
+                "error": "Invalid 2FA verification code. Please check your authenticator app."
+            })
+
+        revoke_session(pending_token, conn=conn)
+        full_token = create_session(user["id"], conn=conn)
+
+        response = RedirectResponse(url="/", status_code=303)
+        response.delete_cookie(key="myredge_2fa_pending")
+        response.set_cookie(key="myredge_session", value=full_token, httponly=True, samesite="lax")
+        return response
+    finally:
+        conn.close()
+
+@app.post("/api/logout")
+def post_logout(request: Request):
+    """Revoke active session token and clear cookies."""
+    session_token = request.cookies.get("myredge_session")
+    if session_token:
+        conn = get_connection()
+        try:
+            revoke_session(session_token, conn=conn)
+        finally:
+            conn.close()
+
+    response = RedirectResponse(url="/login?logged_out=1", status_code=303)
+    response.delete_cookie(key="myredge_session")
+    response.delete_cookie(key="myredge_2fa_pending")
+    return response
+
+@app.get("/settings", response_class=HTMLResponse)
+def read_settings(request: Request):
+    """Settings & System Security Dashboard view."""
+    conn = get_connection()
+    try:
+        user = getattr(request.state, "user", None)
+        if not user:
+            return RedirectResponse(url="/login", status_code=303)
+
+        user_data = get_user_by_id(user["id"], conn=conn)
+        settings_data = get_user_settings(conn=conn)
+        qr_url = get_totp_qr_data_url(user_data["totp_secret"], user_data["username"])
+
+        success_msg = request.query_params.get("success")
+        error_msg = request.query_params.get("error")
+
+        return templates.TemplateResponse(request=request, name="settings.html", context={
+            "active_page": "settings",
+            "user": user_data,
+            "settings": settings_data,
+            "qr_data_url": qr_url,
+            "success_msg": success_msg,
+            "error_msg": error_msg
+        })
+    finally:
+        conn.close()
+
+@app.post("/api/settings/credentials")
+def update_credentials(
+    request: Request,
+    username: str = Form(...),
+    current_password: str = Form(...),
+    new_password: str = Form(default=""),
+    confirm_password: str = Form(default="")
+):
+    """Update master username or password."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    conn = get_connection()
+    try:
+        user_db = get_user_by_id(user["id"], conn=conn)
+        if not verify_password(current_password, user_db["password_hash"]):
+            return RedirectResponse(url="/settings?error=Incorrect+current+password.", status_code=303)
+
+        if new_password and new_password.strip():
+            if new_password != confirm_password:
+                return RedirectResponse(url="/settings?error=New+passwords+do+not+match.", status_code=303)
+            if len(new_password) < 6:
+                return RedirectResponse(url="/settings?error=Password+must+be+at+least+6+characters.", status_code=303)
+
+        update_user_credentials(user["id"], new_username=username, new_password=new_password, conn=conn)
+        return RedirectResponse(url="/settings?success=Credentials+updated+successfully.", status_code=303)
+    finally:
+        conn.close()
+
+@app.post("/api/settings/2fa/enable")
+def enable_2fa(
+    request: Request,
+    otp_code: str = Form(...)
+):
+    """Enable 2FA TOTP after verifying 6-digit code."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    conn = get_connection()
+    try:
+        user_db = get_user_by_id(user["id"], conn=conn)
+        if not verify_totp_code(user_db["totp_secret"], otp_code):
+            return RedirectResponse(url="/settings?error=Invalid+6-digit+code.+Please+check+your+authenticator+app.", status_code=303)
+
+        update_user_totp_secret(user["id"], secret=user_db["totp_secret"], is_enabled=True, conn=conn)
+        return RedirectResponse(url="/settings?success=Two-Factor+Authentication+enabled+successfully!", status_code=303)
+    finally:
+        conn.close()
+
+@app.post("/api/settings/2fa/disable")
+def disable_2fa(request: Request):
+    """Disable 2FA TOTP."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    conn = get_connection()
+    try:
+        user_db = get_user_by_id(user["id"], conn=conn)
+        update_user_totp_secret(user["id"], secret=user_db["totp_secret"], is_enabled=False, conn=conn)
+        return RedirectResponse(url="/settings?success=Two-Factor+Authentication+disabled.", status_code=303)
+    finally:
+        conn.close()
+
+@app.post("/api/settings/timeout")
+def update_timeout(
+    request: Request,
+    timeout_minutes: int = Form(...)
+):
+    """Update session inactivity timeout."""
+    conn = get_connection()
+    try:
+        update_session_timeout(timeout_minutes, conn=conn)
+        return RedirectResponse(url=f"/settings?success=Session+inactivity+timeout+updated+to+{timeout_minutes}+minutes.", status_code=303)
+    finally:
+        conn.close()
+
 
 
 

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Settings & System Security - MYREDGE{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom: 24px;">
+    <h1 style="font-size: 24px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px;">
+        <span>⚙️ Settings & System Security</span>
+    </h1>
+    <p style="color: var(--text-secondary); margin: 4px 0 0 0; font-size: 14px;">
+        Manage master credentials, Two-Factor Authentication (2FA), and session timeout duration.
+    </p>
+</div>
+
+<!-- Alert Notifications -->
+{% if success_msg %}
+<div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34D399; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+    <span>✅ {{ success_msg }}</span>
+</div>
+{% endif %}
+
+{% if error_msg %}
+<div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #F87171; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+    <span>⚠️ {{ error_msg }}</span>
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px; margin-bottom: 32px;">
+
+    <!-- Card 1: Master Credentials -->
+    <div class="card" style="padding: 24px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(255,255,255,0.08);">
+        <h2 style="font-size: 18px; font-weight: 700; margin: 0 0 8px 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>🔑 Master Account Credentials</span>
+        </h2>
+        <p style="font-size: 13px; color: var(--text-secondary); margin: 0 0 20px 0;">
+            Update your master username or password. Current password is required to save changes.
+        </p>
+
+        <form action="/api/settings/credentials" method="POST">
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Username</label>
+                <input type="text" name="username" value="{{ user.username }}" required style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #FFF; font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Current Password (Required)</label>
+                <input type="password" name="current_password" required placeholder="Verify current password" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #FFF; font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">New Password (Optional)</label>
+                <input type="password" name="new_password" placeholder="Leave blank to keep unchanged" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #FFF; font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Confirm New Password</label>
+                <input type="password" name="confirm_password" placeholder="Re-enter new password" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #FFF; font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <button type="submit" class="btn" style="background: #2563EB; color: #FFF; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%;">
+                Save Credentials Changes
+            </button>
+        </form>
+    </div>
+
+    <!-- Card 2: Two-Factor Authentication (OTP / 2FA) -->
+    <div class="card" style="padding: 24px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <div>
+                <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <span>🔐 Two-Factor Authentication (OTP)</span>
+                </h2>
+                <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">
+                    Secure your account with Google Authenticator, Authy, or 1Password.
+                </p>
+            </div>
+            <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; background: {% if user.is_totp_enabled %}rgba(16, 185, 129, 0.2){% else %}rgba(245, 158, 11, 0.2){% endif %}; color: {% if user.is_totp_enabled %}#34D399{% else %}#FBBF24{% endif %}; border: 1px solid {% if user.is_totp_enabled %}rgba(16, 185, 129, 0.3){% else %}rgba(245, 158, 11, 0.3){% endif %};">
+                {% if user.is_totp_enabled %}Active 🔐{% else %}Disabled ⚠️{% endif %}
+            </span>
+        </div>
+
+        {% if user.is_totp_enabled %}
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 16px; border-radius: 12px; margin: 20px 0;">
+            <div style="font-size: 14px; font-weight: 600; color: #34D399; margin-bottom: 6px;">2FA Verification Active</div>
+            <p style="font-size: 12.5px; color: #CBD5E1; margin: 0 0 12px 0;">Your dashboard requires a 6-digit TOTP code at sign in.</p>
+            <form action="/api/settings/2fa/disable" method="POST">
+                <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.2); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                    Disable 2FA Security
+                </button>
+            </form>
+        </div>
+        {% else %}
+        <!-- Setup 2FA Form -->
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 12px; margin: 16px 0; text-align: center;">
+            <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 10px;">
+                Scan QR Code with Google Authenticator or Authy:
+            </span>
+            <div style="background: #FFF; padding: 12px; border-radius: 12px; display: inline-block; margin-bottom: 12px;">
+                <img src="{{ qr_data_url }}" alt="2FA QR Code" style="width: 140px; height: 140px; display: block;">
+            </div>
+            <div style="font-size: 12px; color: #94A3B8;">
+                Manual Secret Key: <strong style="color: #60A5FA; font-family: monospace; font-size: 13px;">{{ user.totp_secret }}</strong>
+            </div>
+        </div>
+
+        <form action="/api/settings/2fa/enable" method="POST">
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Enter 6-Digit Code from App to Confirm</label>
+                <input type="text" name="otp_code" maxlength="6" pattern="[0-9]*" inputmode="numeric" required placeholder="000000" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(59, 130, 246, 0.4); color: #FFF; font-size: 16px; font-weight: 700; letter-spacing: 4px; text-align: center; box-sizing: border-box;">
+            </div>
+            <button type="submit" class="btn" style="background: #10B981; color: #FFF; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%;">
+                Enable 2FA Verification ➔
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- Card 3: Session Inactivity Timeout -->
+    <div class="card" style="padding: 24px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(255,255,255,0.08);">
+        <h2 style="font-size: 18px; font-weight: 700; margin: 0 0 8px 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>⏱️ Session Inactivity Timeout</span>
+        </h2>
+        <p style="font-size: 13px; color: var(--text-secondary); margin: 0 0 20px 0;">
+            Automatically log out and require sign-in after a specified period of inactivity.
+        </p>
+
+        <form action="/api/settings/timeout" method="POST">
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">Inactivity Timeout Duration</label>
+                <select name="timeout_minutes" style="width: 100%; padding: 10px 12px; border-radius: 8px; background: #171A21; border: 1px solid rgba(255,255,255,0.15); color: #FFF; font-size: 14px; box-sizing: border-box;">
+                    <option value="15" {% if settings.session_timeout_minutes == 15 %}selected{% endif %}>15 Minutes</option>
+                    <option value="30" {% if settings.session_timeout_minutes == 30 %}selected{% endif %}>30 Minutes (Recommended)</option>
+                    <option value="60" {% if settings.session_timeout_minutes == 60 %}selected{% endif %}>1 Hour</option>
+                    <option value="240" {% if settings.session_timeout_minutes == 240 %}selected{% endif %}>4 Hours</option>
+                    <option value="1440" {% if settings.session_timeout_minutes == 1440 %}selected{% endif %}>24 Hours</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn" style="background: #2563EB; color: #FFF; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%;">
+                Save Timeout Preference
+            </button>
+        </form>
+    </div>
+
+    <!-- Card 4: System Data Maintenance -->
+    <div class="card" style="padding: 24px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(255,255,255,0.08);">
+        <h2 style="font-size: 18px; font-weight: 700; margin: 0 0 8px 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>🧹 System & Data Reset</span>
+        </h2>
+        <p style="font-size: 13px; color: var(--text-secondary); margin: 0 0 20px 0;">
+            Manage local demo data or clear sample entries before linking live accounts.
+        </p>
+
+        <form action="/api/purge-demo" method="POST" onsubmit="return confirm('Are you sure you want to clear demo transactions and accounts?');">
+            <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%;">
+                Purge Demo Sample Data
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

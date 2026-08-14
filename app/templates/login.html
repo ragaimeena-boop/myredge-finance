@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - MYREDGE Finance</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/index.css">
+    <style>
+        body {
+            background-color: #0F1115;
+            color: #F8FAFC;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .login-card {
+            background: #171A21;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 36px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #FFF;
+            font-size: 14px;
+            box-sizing: border-box;
+            margin-top: 6px;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: #2563EB;
+            color: #FFF;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 20px;
+        }
+        .btn-submit:hover {
+            background: #1D4ED8;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="font-size: 32px; font-weight: 800; color: #FFF; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span style="background: #2563EB; width: 42px; height: 42px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 20px;">ME</span>
+                <span>MYR<span style="color: #3B82F6;">EDGE</span></span>
+            </div>
+            <p style="font-size: 13px; color: #94A3B8; margin: 8px 0 0 0;">Sign in to access your personal finance dashboard</p>
+        </div>
+
+        {% if timeout %}
+        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #FBBF24; padding: 12px; border-radius: 10px; font-size: 13px; margin-bottom: 20px; text-align: center;">
+            ⏱️ Your session expired due to inactivity. Please log in again.
+        </div>
+        {% endif %}
+
+        {% if error %}
+        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #F87171; padding: 12px; border-radius: 10px; font-size: 13px; margin-bottom: 20px; text-align: center;">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        {% if logged_out %}
+        <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34D399; padding: 12px; border-radius: 10px; font-size: 13px; margin-bottom: 20px; text-align: center;">
+            Logged out successfully.
+        </div>
+        {% endif %}
+
+        <form action="/api/login" method="POST">
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 13px; font-weight: 600; color: #CBD5E1;">Username</label>
+                <input type="text" name="username" class="form-control" required placeholder="Enter username" autofocus>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 13px; font-weight: 600; color: #CBD5E1;">Password</label>
+                <input type="password" name="password" class="form-control" required placeholder="Enter password">
+            </div>
+
+            <button type="submit" class="btn-submit">Sign In ➔</button>
+        </form>
+    </div>
+</body>
+</html>
