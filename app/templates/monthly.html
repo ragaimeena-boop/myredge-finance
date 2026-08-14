@@ -266,9 +266,13 @@ document.addEventListener("DOMContentLoaded", function() {
                     bodyFont: { size: 13 },
                     callbacks: {
                         title: function(tooltipItems) {
-                            if (!tooltipItems.length) return '';
-                            const idx = tooltipItems[0].dataIndex;
-                            return trendChart.activeFullMonths ? trendChart.activeFullMonths[idx] : (rollingFullMonths[idx] || tooltipItems[0].label);
+                            if (!tooltipItems || !tooltipItems.length) return '';
+                            const itemLabel = tooltipItems[0].label;
+                            const idx = rollingLabels.indexOf(itemLabel);
+                            if (idx !== -1 && rollingFullMonths[idx]) {
+                                return rollingFullMonths[idx];
+                            }
+                            return itemLabel;
                         },
                         label: function(context) {
                             let categoryName = context.dataset.label || '';
@@ -284,12 +288,14 @@ document.addEventListener("DOMContentLoaded", function() {
                     grid: { display: false },
                     ticks: {
                         color: function(context) {
-                            return (context.index === currentMonthIdx || trendChart.data.labels.length === 1) ? '#F8FAFC' : '#94A3B8';
+                            const isSingle = context.chart.data.labels.length === 1;
+                            return (isSingle || context.index === currentMonthIdx) ? '#F8FAFC' : '#94A3B8';
                         },
                         font: function(context) {
+                            const isSingle = context.chart.data.labels.length === 1;
                             return {
                                 size: 13,
-                                weight: (context.index === currentMonthIdx || trendChart.data.labels.length === 1) ? '700' : '500'
+                                weight: (isSingle || context.index === currentMonthIdx) ? '700' : '500'
                             };
                         }
                     }
@@ -311,8 +317,6 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
     });
-
-    trendChart.activeFullMonths = rollingFullMonths;
 
     // Interactive Pill Click Handlers
     const pillLast = document.getElementById('pillLastMonth');
@@ -336,7 +340,6 @@ document.addEventListener("DOMContentLoaded", function() {
             trendChart.data.datasets[0].data = incomeData;
             trendChart.data.datasets[1].data = spendingData;
             trendChart.data.datasets[2].data = billsData;
-            trendChart.activeFullMonths = rollingFullMonths;
             trendChart.update();
         });
     }
@@ -348,7 +351,6 @@ document.addEventListener("DOMContentLoaded", function() {
             trendChart.data.datasets[0].data = [incomeData[currentMonthIdx]];
             trendChart.data.datasets[1].data = [spendingData[currentMonthIdx]];
             trendChart.data.datasets[2].data = [billsData[currentMonthIdx]];
-            trendChart.activeFullMonths = [rollingFullMonths[currentMonthIdx]];
             trendChart.update();
         });
     }
@@ -360,7 +362,6 @@ document.addEventListener("DOMContentLoaded", function() {
             trendChart.data.datasets[0].data = [incomeData[lastMonthIdx]];
             trendChart.data.datasets[1].data = [spendingData[lastMonthIdx]];
             trendChart.data.datasets[2].data = [billsData[lastMonthIdx]];
-            trendChart.activeFullMonths = [rollingFullMonths[lastMonthIdx]];
             trendChart.update();
         });
     }
