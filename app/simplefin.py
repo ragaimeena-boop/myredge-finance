@@ -160,7 +160,6 @@ def apply_categorization_rules(conn, description: str, payee: str) -> Tuple[int 
                         INSERT OR IGNORE INTO rules (pattern, category_id, clean_payee, is_transfer, priority)
                         VALUES (?, ?, ?, ?, 5);
                         """, (kw, cat_id, final_payee, cat_is_trans))
-                        conn.commit()
                     except Exception:
                         pass
                     return cat_id, final_payee, cat_is_trans
@@ -280,11 +279,12 @@ def ai_autocategorize_transactions(conn=None, force_all: bool = False) -> int:
 
         tx_items = []
         for tx in txs:
+            amt_cents = tx["amount_cents"] if ("amount_cents" in tx.keys() and tx["amount_cents"] is not None) else 0
             tx_items.append({
                 "id": str(tx["id"]),
                 "description": tx["description"] or "",
                 "payee": tx["payee"] or "",
-                "amount": str(tx["amount_cents"] / 100.0)
+                "amount": str(amt_cents / 100.0)
             })
 
         ai_results = []
@@ -324,8 +324,9 @@ def ai_autocategorize_transactions(conn=None, force_all: bool = False) -> int:
                 if res.status_code == 200:
                     resp_json = res.json()
                     text_content = resp_json['candidates'][0]['content']['parts'][0]['text']
-                    clean_json_str = re.sub(r"```json|```", "", text_content).strip()
-                    ai_results = json.loads(clean_json_str)
+                    json_match = re.search(r'\[.*\]', text_content, re.DOTALL)
+                    if json_match:
+                        ai_results = json.loads(json_match.group(0))
             except Exception as e:
                 print(f"[AI CATEGORIZATION WARNING] Gemini API call fallback: {e}")
 

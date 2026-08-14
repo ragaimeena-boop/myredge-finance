@@ -386,11 +386,16 @@ def trigger_recategorize_uncategorized():
 def trigger_ai_categorize():
     """Run Gemini AI Auto-Categorizer across transactions."""
     from app.simplefin import ai_autocategorize_transactions
-    conn = get_connection()
+    count = 0
     try:
-        count = ai_autocategorize_transactions(conn=conn, force_all=True)
-    finally:
-        conn.close()
+        conn = get_connection()
+        try:
+            count = ai_autocategorize_transactions(conn=conn, force_all=True)
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[AI CATEGORIZE ROUTE WARNING] {e}")
+        count = 0
     return RedirectResponse(url=f"/transactions?categorized_count={count}", status_code=303)
 
 @app.get("/subscriptions", response_class=HTMLResponse)
