@@ -261,6 +261,7 @@ def read_transactions(
                 selected_category = tx_dict["category_name"]
 
         active_filter_label = category_name or selected_category if (cat_id_int or category_name) else None
+        categorized_count = request.query_params.get("categorized_count")
 
         return templates.TemplateResponse(request=request, name="transactions.html", context={
             "active_page": "transactions",
@@ -268,18 +269,23 @@ def read_transactions(
             "categories": all_categories,
             "selected_category_id": cat_id_int,
             "active_filter_label": active_filter_label,
-            "search_query": q.strip() if q else ""
+            "search_query": q.strip() if q else "",
+            "categorized_count": categorized_count
         })
     finally:
         conn.close()
 
 @app.post("/api/transactions/{tx_id}/category")
 def update_transaction_category(tx_id: str, request: Request, category_id: str = Form(default="")):
-    """Reassign category or transfer flag for a transaction."""
+    """Reassign category or transfer flag for a transaction, learning rules automatically."""
     conn = get_connection()
     now_str = current_eastern_time().isoformat()
     try:
         cursor = conn.cursor()
+        
+        cursor.execute("SELECT description, payee FROM transactions WHERE id = ?;", (tx_id,))
+        tx_row = cursor.fetchone()
+
         if category_id == "transfer":
             cursor.execute("""
             UPDATE transactions 
@@ -287,11 +293,28 @@ def update_transaction_category(tx_id: str, request: Request, category_id: str =
             WHERE id = ?;
             """, (now_str, tx_id))
         elif category_id.isdigit():
+            cat_id = int(category_id)
             cursor.execute("""
             UPDATE transactions 
             SET category_id = ?, is_transfer = 0, updated_at = ?
             WHERE id = ?;
-            """, (int(category_id), now_str, tx_id))
+            """, (cat_id, now_str, tx_id))
+
+            # Learn rule from user action & bulk categorize matching uncategorized transactions
+            if tx_row:
+                raw_pattern = (tx_row["payee"] or tx_row["description"] or "").strip().upper()
+                if len(raw_pattern) >= 3:
+                    cursor.execute("""
+                    INSERT OR IGNORE INTO rules (pattern, category_id, clean_payee, is_transfer, priority)
+                    VALUES (?, ?, ?, 0, 20);
+                    """, (raw_pattern, cat_id, tx_row["payee"]))
+                    
+                    cursor.execute("""
+                    UPDATE transactions
+                    SET category_id = ?, updated_at = ?
+                    WHERE (category_id IS NULL OR category_id = (SELECT id FROM categories WHERE name = 'Uncategorized'))
+                      AND (UPPER(description) LIKE ? OR UPPER(payee) LIKE ?);
+                    """, (cat_id, now_str, f"%{raw_pattern}%", f"%{raw_pattern}%"))
         else:
             cursor.execute("""
             UPDATE transactions 
@@ -304,6 +327,17 @@ def update_transaction_category(tx_id: str, request: Request, category_id: str =
         return RedirectResponse(url=referer, status_code=303)
     finally:
         conn.close()
+
+@app.post("/api/transactions/recategorize")
+def trigger_recategorize_uncategorized():
+    """Run rule engine across all uncategorized transactions."""
+    from app.simplefin import reapply_rules_to_uncategorized
+    conn = get_connection()
+    try:
+        count = reapply_rules_to_uncategorized(conn=conn)
+    finally:
+        conn.close()
+    return RedirectResponse(url=f"/transactions?categorized_count={count}", status_code=303)
 
 @app.get("/subscriptions", response_class=HTMLResponse)
 def read_subscriptions(request: Request):

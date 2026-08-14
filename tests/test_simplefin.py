@@ -73,3 +73,25 @@ def test_idempotent_ingestion(test_db):
 
     cursor.execute("SELECT COUNT(*) FROM transactions;")
     assert cursor.fetchone()[0] == 8
+
+def test_reapply_rules_to_uncategorized(test_db):
+    from app.simplefin import reapply_rules_to_uncategorized
+    cursor = test_db.cursor()
+
+    # Insert an uncategorized Publix transaction
+    cursor.execute("SELECT id FROM categories WHERE name = 'Uncategorized';")
+    uncat_id = cursor.fetchone()["id"]
+
+    cursor.execute("""
+    INSERT INTO transactions (id, account_id, posted_at, posted_timestamp, amount_cents, description, payee, pending, category_id, created_at, updated_at)
+    VALUES ('tx_publix_test', 'acc_checking_01', '2026-08-14', 1786665600, -6540, 'PUBLIX SUPER MARKETS #1234', 'Publix', 0, ?, '2026-08-14', '2026-08-14');
+    """, (uncat_id,))
+    test_db.commit()
+
+    count = reapply_rules_to_uncategorized(conn=test_db)
+    assert count >= 1
+
+    cursor.execute("SELECT c.name FROM transactions t JOIN categories c ON t.category_id = c.id WHERE t.id = 'tx_publix_test';")
+    row = cursor.fetchone()
+    assert row["name"] == "Groceries"
+

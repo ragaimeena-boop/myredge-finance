@@ -191,28 +191,117 @@ def init_db():
         VALUES (?, ?, ?, ?, ?, ?);
         """, default_categories)
 
-    # Seed Default Categorization Rules if empty
-    cursor.execute("SELECT COUNT(*) FROM rules;")
-    if cursor.fetchone()[0] == 0:
-        default_rules = [
-            ("CHIPOTLE", "Restaurants & Dining", "Chipotle", 0),
-            ("FLORIDA POWER", "Utilities", "Florida Power & Light", 0),
-            ("CREDIT CARD PAYMENT", "Credit Card Payment", None, 1),
-            ("PAYMENT THANK YOU", "Credit Card Payment", None, 1),
-            ("AUTOPAY CREDIT CARD", "Credit Card Payment", None, 1),
-            ("PAYROLL DIRECT DEPOSIT", "Salary & Wages", None, 0),
-            ("DIVIDEND", "Investments & Interest", None, 0),
-            ("SCHWAB", "Investments & Interest", "Charles Schwab", 0),
-        ]
-        
-        for pattern, cat_name, clean_payee, is_trans in default_rules:
-            cursor.execute("SELECT id FROM categories WHERE name = ?;", (cat_name,))
-            row = cursor.fetchone()
-            if row:
-                cursor.execute("""
-                INSERT OR IGNORE INTO rules (pattern, category_id, clean_payee, is_transfer, priority)
-                VALUES (?, ?, ?, ?, 10);
-                """, (pattern, row["id"], clean_payee, is_trans))
+    # Seed Default Categorization Rules (INSERT OR IGNORE ensures missing rules are safely added to existing DBs)
+    default_rules = [
+        # Transfers & Credit Cards
+        ("CREDIT CARD", "Credit Card Payment", None, 1),
+        ("PAYMENT THANK YOU", "Credit Card Payment", None, 1),
+        ("AUTOPAY CREDIT CARD", "Credit Card Payment", None, 1),
+        ("ONLINE PAYMENT", "Credit Card Payment", None, 1),
+        ("TRANSFER TO", "Internal Transfer", None, 1),
+        ("TRANSFER FROM", "Internal Transfer", None, 1),
+        ("ZELLE", "Internal Transfer", None, 1),
+        ("VENMO", "Internal Transfer", None, 1),
+        ("PAYPAL", "Internal Transfer", None, 1),
+
+        # Food & Dining
+        ("PUBLIX", "Groceries", "Publix", 0),
+        ("TRADER JOE", "Groceries", "Trader Joe's", 0),
+        ("WHOLEFDS", "Groceries", "Whole Foods Market", 0),
+        ("WHOLE FOODS", "Groceries", "Whole Foods Market", 0),
+        ("ALDI", "Groceries", "ALDI", 0),
+        ("COSTCO", "Groceries", "Costco Wholesale", 0),
+        ("SAM'S CLUB", "Groceries", "Sam's Club", 0),
+        ("SAMS CLUB", "Groceries", "Sam's Club", 0),
+        ("KROGER", "Groceries", "Kroger", 0),
+        ("CHIPOTLE", "Restaurants & Dining", "Chipotle", 0),
+        ("STARBUCKS", "Restaurants & Dining", "Starbucks", 0),
+        ("DUNKIN", "Restaurants & Dining", "Dunkin'", 0),
+        ("MCDONALD", "Restaurants & Dining", "McDonald's", 0),
+        ("PANERA", "Restaurants & Dining", "Panera Bread", 0),
+        ("DOORDASH", "Restaurants & Dining", "DoorDash", 0),
+        ("UBER EATS", "Restaurants & Dining", "Uber Eats", 0),
+        ("GRUBHUB", "Restaurants & Dining", "Grubhub", 0),
+
+        # Shopping & Retail
+        ("AMAZON", "Shopping & Retail", "Amazon", 0),
+        ("AMZN", "Shopping & Retail", "Amazon", 0),
+        ("WALMART", "Shopping & Retail", "Walmart", 0),
+        ("WAL-MART", "Shopping & Retail", "Walmart", 0),
+        ("TARGET", "Shopping & Retail", "Target", 0),
+        ("HOME DEPOT", "Home Maintenance", "The Home Depot", 0),
+        ("LOWES", "Home Maintenance", "Lowe's", 0),
+        ("LOWE'S", "Home Maintenance", "Lowe's", 0),
+        ("BEST BUY", "Shopping & Retail", "Best Buy", 0),
+        ("APPLE.COM", "Shopping & Retail", "Apple", 0),
+
+        # Transportation
+        ("CHEVRON", "Fuel & Gas", "Chevron", 0),
+        ("SHELL", "Fuel & Gas", "Shell", 0),
+        ("EXXON", "Fuel & Gas", "ExxonMobil", 0),
+        ("MOBIL", "Fuel & Gas", "ExxonMobil", 0),
+        ("BP ", "Fuel & Gas", "BP", 0),
+        ("WAWA", "Fuel & Gas", "Wawa", 0),
+        ("SPEEDWAY", "Fuel & Gas", "Speedway", 0),
+        ("VALERO", "Fuel & Gas", "Valero", 0),
+        ("UBER ", "Transit & Rideshare", "Uber", 0),
+        ("UBER*", "Transit & Rideshare", "Uber", 0),
+        ("LYFT", "Transit & Rideshare", "Lyft", 0),
+        ("GEICO", "Auto Payment & Insurance", "Geico", 0),
+        ("PROGRESSIVE", "Auto Payment & Insurance", "Progressive", 0),
+        ("STATE FARM", "Auto Payment & Insurance", "State Farm", 0),
+
+        # Subscriptions
+        ("NETFLIX", "Subscriptions & Recurring", "Netflix", 0),
+        ("SPOTIFY", "Subscriptions & Recurring", "Spotify", 0),
+        ("HULU", "Subscriptions & Recurring", "Hulu", 0),
+        ("DISNEY+", "Subscriptions & Recurring", "Disney+", 0),
+        ("DISNEYPLUS", "Subscriptions & Recurring", "Disney+", 0),
+        ("NYTIMES", "Subscriptions & Recurring", "The New York Times", 0),
+        ("YOUTUBE", "Subscriptions & Recurring", "YouTube Premium", 0),
+
+        # Utilities
+        ("FLORIDA POWER", "Utilities", "Florida Power & Light", 0),
+        ("FPL", "Utilities", "Florida Power & Light", 0),
+        ("DUKE ENERGY", "Utilities", "Duke Energy", 0),
+        ("AT&T", "Utilities", "AT&T", 0),
+        ("ATT ", "Utilities", "AT&T", 0),
+        ("VERIZON", "Utilities", "Verizon", 0),
+        ("T-MOBILE", "Utilities", "T-Mobile", 0),
+        ("COMCAST", "Utilities", "Comcast Xfinity", 0),
+        ("XFINITY", "Utilities", "Comcast Xfinity", 0),
+        ("SPECTRUM", "Utilities", "Spectrum", 0),
+
+        # Healthcare
+        ("QUEST DIAG", "Medical & Healthcare", "Quest Diagnostics", 0),
+        ("LABCORP", "Medical & Healthcare", "Labcorp", 0),
+        ("CVS", "Medical & Healthcare", "CVS Pharmacy", 0),
+        ("WALGREENS", "Medical & Healthcare", "Walgreens", 0),
+
+        # Income
+        ("PAYROLL DIRECT DEPOSIT", "Salary & Wages", None, 0),
+        ("DIRECT DEPOSIT", "Salary & Wages", None, 0),
+        ("PAYROLL", "Salary & Wages", None, 0),
+        ("DIVIDEND", "Investments & Interest", None, 0),
+        ("SCHWAB", "Investments & Interest", "Charles Schwab", 0),
+        ("FIDELITY", "Investments & Interest", "Fidelity Investments", 0),
+        ("VANGUARD", "Investments & Interest", "Vanguard", 0),
+    ]
+    
+    for pattern, cat_name, clean_payee, is_trans in default_rules:
+        cursor.execute("SELECT id FROM categories WHERE name = ?;", (cat_name,))
+        row = cursor.fetchone()
+        if row:
+            cursor.execute("""
+            INSERT OR IGNORE INTO rules (pattern, category_id, clean_payee, is_transfer, priority)
+            VALUES (?, ?, ?, ?, 10);
+            """, (pattern, row["id"], clean_payee, is_trans))
+
+    conn.commit()
+
+    # Re-apply rules against any existing Uncategorized transactions
+    from app.simplefin import reapply_rules_to_uncategorized
+    reapply_rules_to_uncategorized(conn=conn)
 
     # Seed Sample Investment Accounts & Holdings if empty AND no SIMPLEFIN_ACCESS_URL configured
     if not settings.SIMPLEFIN_ACCESS_URL:

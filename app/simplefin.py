@@ -62,6 +62,51 @@ def apply_categorization_rules(conn, description: str, payee: str) -> Tuple[int 
     cat_id = row["id"] if row else None
     return cat_id, payee, 0
 
+def reapply_rules_to_uncategorized(conn=None) -> int:
+    """
+    Re-evaluate categorization rules against all currently Uncategorized transactions.
+    Preserves user manual category assignments.
+    Returns count of transactions categorized.
+    """
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    categorized_count = 0
+    try:
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT id FROM categories WHERE name = 'Uncategorized';")
+        row = cursor.fetchone()
+        uncat_id = row["id"] if row else None
+
+        cursor.execute("""
+        SELECT id, description, payee 
+        FROM transactions 
+        WHERE (category_id = ? OR category_id IS NULL) AND is_transfer = 0;
+        """, (uncat_id,))
+        txs = cursor.fetchall()
+
+        now_str = current_eastern_time().isoformat()
+
+        for tx in txs:
+            cat_id, clean_payee, is_transfer = apply_categorization_rules(conn, tx["description"], tx["payee"])
+            if cat_id is not None and cat_id != uncat_id:
+                cursor.execute("""
+                UPDATE transactions
+                SET category_id = ?, payee = ?, is_transfer = ?, updated_at = ?
+                WHERE id = ?;
+                """, (cat_id, clean_payee, is_transfer, now_str, tx["id"]))
+                categorized_count += 1
+
+        conn.commit()
+    finally:
+        if close_conn:
+            conn.close()
+
+    return categorized_count
+
 def ingest_simplefin_data(data: SimpleFINResponse, conn=None) -> Dict[str, int]:
     """
     Idempotent upsert of SimpleFIN account and transaction records into SQLite database.

@@ -36,8 +36,18 @@
             <a href="/transactions" class="btn" style="color: var(--expense-color);">✕ Clear Filters</a>
             {% endif %}
         </form>
+
+        <form action="/api/transactions/recategorize" method="post" style="display:inline-block; margin-top: 8px;">
+            <button type="submit" class="btn" style="background: var(--surface-color); color: var(--accent-color); border: 1px solid var(--accent-color); font-weight: 500;" title="Run rules against uncategorized transactions">⚡ Auto-Categorize Uncategorized</button>
+        </form>
     </div>
 </div>
+
+{% if categorized_count %}
+<div class="alert alert-success" style="background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.4); color: #2ecc71; padding: 12px 18px; border-radius: 10px; margin-bottom: 20px; font-weight: 500;">
+    ✓ Auto-categorization rule engine executed: {{ categorized_count }} transaction(s) were automatically categorized!
+</div>
+{% endif %}
 
 {% if search_query or active_filter_label %}
 <div style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">
