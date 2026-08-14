@@ -171,6 +171,32 @@ def init_db():
     );
     """)
 
+    # Market Research table for AI Market Briefings
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS market_research (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        research_date TEXT UNIQUE NOT NULL,
+        market_sentiment TEXT NOT NULL,
+        macro_summary TEXT NOT NULL,
+        opportunities_json TEXT NOT NULL,
+        top_gainers_json TEXT,
+        top_losers_json TEXT,
+        created_at TEXT NOT NULL
+    );
+    """)
+
+    # Ticker Deep Dives table for On-Demand AI Reports
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ticker_deep_dives (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticker TEXT UNIQUE NOT NULL,
+        company_name TEXT NOT NULL,
+        current_price REAL,
+        ai_report_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    """)
+
     # Seed Default Categories (INSERT OR IGNORE to add new categories safely)
     default_categories = [
         # Income

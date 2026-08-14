@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Market & AI Deep Research - MYREDGE{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 20px;">
+    <div>
+        <h1 style="font-size: 24px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px;">
+            <span>📈 Stock Market & AI Intelligence</span>
+        </h1>
+        <p style="color: var(--text-secondary); margin: 4px 0 0 0; font-size: 14px;">
+            Live market quotes, top movers, and AI web-grounded daily research briefings.
+        </p>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <form action="/api/stock-market/refresh" method="POST" style="margin: 0;">
+            <button type="submit" class="btn" style="background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                <span>⚡ Refresh AI Research</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if refreshed %}
+<div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34D399; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+    <span>✅ Live AI Market Deep Research updated successfully!</span>
+</div>
+{% endif %}
+
+<!-- Top Live Market Indices Ticker Banner -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px;">
+    {% for idx in research.indices %}
+    <div class="card" style="padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid rgba(255,255,255,0.06); transition: transform 0.2s, border-color 0.2s;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">{{ idx.name }}</span>
+            <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 700; background: {% if idx.status == 'up' %}rgba(16, 185, 129, 0.15){% else %}rgba(239, 68, 68, 0.15){% endif %}; color: {% if idx.status == 'up' %}#34D399{% else %}#F87171{% endif %};">
+                {% if idx.status == 'up' %}+{% endif %}{{ idx.pct_change }}%
+            </span>
+        </div>
+        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums;">
+            ${{ idx.price }}
+        </div>
+        <div style="font-size: 12px; color: {% if idx.status == 'up' %}#34D399{% else %}#F87171{% endif %}; margin-top: 4px; font-weight: 500;">
+            {% if idx.status == 'up' %}▲{% else %}▼{% endif %} ${{ idx.change }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Main Layout: AI Briefing + On-Demand Search -->
+<div style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-bottom: 24px;">
+    
+    <!-- AI Executive Daily Briefing Card -->
+    <div class="card" style="padding: 24px; border-radius: 16px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(59, 130, 246, 0.25); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 24px;">🤖</span>
+                <div>
+                    <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: #F8FAFC;">AI Daily Deep Research Briefing</h2>
+                    <span style="font-size: 12px; color: #94A3B8;">Grounded in Live Financial Web Intelligence • {{ research.research_date }}</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 12px; color: #94A3B8;">Market Sentiment:</span>
+                <span style="padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; background: {% if research.market_sentiment == 'Bullish' %}rgba(16, 185, 129, 0.2){% elif research.market_sentiment == 'Bearish' %}rgba(239, 68, 68, 0.2){% else %}rgba(245, 158, 11, 0.2){% endif %}; color: {% if research.market_sentiment == 'Bullish' %}#34D399{% elif research.market_sentiment == 'Bearish' %}#F87171{% else %}#FBBF24{% endif %}; border: 1px solid {% if research.market_sentiment == 'Bullish' %}rgba(16, 185, 129, 0.3){% elif research.market_sentiment == 'Bearish' %}rgba(239, 68, 68, 0.3){% else %}rgba(245, 158, 11, 0.3){% endif %};">
+                    {{ research.market_sentiment }}
+                </span>
+            </div>
+        </div>
+
+        <p style="font-size: 15px; line-height: 1.6; color: #E2E8F0; margin: 0 0 16px 0;">
+            {{ research.macro_summary }}
+        </p>
+    </div>
+
+    <!-- On-Demand Ticker AI Deep Dive Search Bar -->
+    <div class="card" style="padding: 20px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(255,255,255,0.08);">
+        <h3 style="font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>🔎 On-Demand Stock AI Research</span>
+        </h3>
+        <p style="font-size: 13px; color: var(--text-secondary); margin: 0 0 16px 0;">
+            Enter any stock or ETF ticker to generate instant AI thesis, valuation metrics, and news analysis.
+        </p>
+        <div style="display: flex; gap: 10px; max-width: 600px;">
+            <input type="text" id="tickerInput" placeholder="e.g. NVDA, MSFT, AAPL, VOO, AMZN..." style="flex: 1; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #FFF; font-size: 14px; text-transform: uppercase;">
+            <button id="searchTickerBtn" class="btn" style="background: #2563EB; color: #FFF; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                Run AI Deep Dive
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Section: AI Buy Recommendations / Opportunities -->
+<div style="margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>💡 AI Opportunities & Buy Catalysts</span>
+        </h2>
+        <span style="font-size: 12px; color: var(--text-secondary);">Updated Daily by Gemini Deep Research</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+        {% for item in research.opportunities %}
+        <div class="card" style="padding: 22px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, box-shadow 0.2s;">
+            <div>
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 18px; font-weight: 800; color: #3B82F6;">{{ item.ticker }}</span>
+                            <span style="font-size: 11px; padding: 3px 8px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); color: #60A5FA; font-weight: 600;">
+                                {{ item.sector }}
+                            </span>
+                        </div>
+                        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">
+                            {{ item.company_name }}
+                        </div>
+                    </div>
+                    <span style="padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                        {{ item.sentiment }}
+                    </span>
+                </div>
+
+                <!-- Catalyst / Investment Thesis -->
+                <p style="font-size: 13.5px; line-height: 1.5; color: #CBD5E1; margin: 0 0 14px 0;">
+                    {{ item.catalyst_thesis }}
+                </p>
+
+                <!-- Valuation & Risk Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(0,0,0,0.25); padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.04);">
+                    <div>
+                        <span style="font-size: 11px; color: var(--text-secondary); display: block;">Fair Value Target</span>
+                        <span style="font-size: 13px; font-weight: 700; color: #F8FAFC;">{{ item.fair_value_range }}</span>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; color: var(--text-secondary); display: block;">Risk Rating</span>
+                        <span style="font-size: 13px; font-weight: 700; color: {% if item.risk_level == 'Low' %}#34D399{% elif item.risk_level == 'Moderate' %}#FBBF24{% else %}#F87171{% endif %};">
+                            {{ item.risk_level }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Key Drivers -->
+                <div style="margin-bottom: 14px;">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">Key Growth Drivers:</span>
+                    <ul style="margin: 0; padding-left: 16px; font-size: 12px; color: #94A3B8; line-height: 1.6;">
+                        {% for driver in item.key_drivers %}
+                        <li>{{ driver }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Clickable Source News Articles -->
+            <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; margin-top: 8px;">
+                <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+                    📰 Verified News Articles & Sources:
+                </span>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    {% for art in item.source_articles %}
+                    <a href="{{ art.url }}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; color: #60A5FA; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.15); transition: background 0.2s;">
+                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px;">{{ art.title }}</span>
+                        <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); color: #E2E8F0;">{{ art.domain }} ↗</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Section: Live Top Market Movers Radar -->
+<div class="card" style="padding: 24px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
+        <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>🔥 Live Market Movers Radar</span>
+        </h2>
+        
+        <!-- Filter Tabs -->
+        <div style="display: flex; gap: 8px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+            <button id="tabGainers" class="btn" style="padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background: var(--surface-hover); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
+                🔥 Top Gainers
+            </button>
+            <button id="tabLosers" class="btn" style="padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; color: var(--text-secondary); border: none; background: transparent; cursor: pointer;">
+                📉 Top Losers
+            </button>
+            <button id="tabActive" class="btn" style="padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; color: var(--text-secondary); border: none; background: transparent; cursor: pointer;">
+                ⚡ High Volume
+            </button>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="table-responsive">
+        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; color: var(--text-secondary); font-size: 12px;">
+                    <th style="padding: 12px 16px;">Ticker Symbol</th>
+                    <th style="padding: 12px 16px;">Company Name</th>
+                    <th style="padding: 12px 16px; text-align: right;">Live Price</th>
+                    <th style="padding: 12px 16px; text-align: right;">1-Day Change</th>
+                    <th style="padding: 12px 16px; text-align: right;">Change %</th>
+                    <th style="padding: 12px 16px; text-align: center;">Action</th>
+                </tr>
+            </thead>
+            <tbody id="moversTableBody">
+                {% for item in research.top_movers.gainers %}
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13.5px;">
+                    <td style="padding: 12px 16px; font-weight: 700; color: #3B82F6;">{{ item.symbol }}</td>
+                    <td style="padding: 12px 16px; color: var(--text-primary);">{{ item.name }}</td>
+                    <td style="padding: 12px 16px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">${{ item.price }}</td>
+                    <td style="padding: 12px 16px; text-align: right; color: {% if item.status == 'up' %}#34D399{% else %}#F87171{% endif %}; font-weight: 500;">
+                        {% if item.status == 'up' %}+{% endif %}${{ item.change }}
+                    </td>
+                    <td style="padding: 12px 16px; text-align: right;">
+                        <span style="padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: {% if item.status == 'up' %}rgba(16, 185, 129, 0.15){% else %}rgba(239, 68, 68, 0.15){% endif %}; color: {% if item.status == 'up' %}#34D399{% else %}#F87171{% endif %};">
+                            {% if item.status == 'up' %}+{% endif %}{{ item.pct_change }}%
+                        </span>
+                    </td>
+                    <td style="padding: 12px 16px; text-align: center;">
+                        <button onclick="runTickerResearch('{{ item.symbol }}')" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #E2E8F0; padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;">
+                            AI Deep Dive
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal for Ticker AI Deep Dive -->
+<div id="tickerModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999; justify-content: center; align-items: center; padding: 20px;">
+    <div class="card" style="background: #171A21; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; width: 100%; max-width: 650px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+            <div>
+                <h2 id="modalTickerTitle" style="font-size: 22px; font-weight: 800; color: #3B82F6; margin: 0;"></h2>
+                <span id="modalCompanyName" style="font-size: 14px; color: var(--text-secondary);"></span>
+            </div>
+            <button id="closeModalBtn" style="background: transparent; border: none; color: #94A3B8; font-size: 20px; cursor: pointer;">✕</button>
+        </div>
+
+        <div id="modalLoading" style="text-align: center; padding: 30px; color: #94A3B8;">
+            <div style="font-size: 24px; margin-bottom: 10px;">🤖</div>
+            <span>Generating Gemini AI research report...</span>
+        </div>
+
+        <div id="modalContent" style="display: none;">
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; margin-bottom: 16px;">
+                <div>
+                    <span style="font-size: 11px; color: #94A3B8; display: block;">Live Price</span>
+                    <span id="modalPrice" style="font-size: 15px; font-weight: 700; color: #FFF;"></span>
+                </div>
+                <div>
+                    <span style="font-size: 11px; color: #94A3B8; display: block;">P/E Ratio</span>
+                    <span id="modalPE" style="font-size: 15px; font-weight: 700; color: #FFF;"></span>
+                </div>
+                <div>
+                    <span style="font-size: 11px; color: #94A3B8; display: block;">Market Cap</span>
+                    <span id="modalMCap" style="font-size: 15px; font-weight: 700; color: #FFF;"></span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <h4 style="font-size: 13px; font-weight: 700; color: #3B82F6; margin: 0 0 6px 0;">AI Investment Thesis</h4>
+                <p id="modalThesis" style="font-size: 13.5px; line-height: 1.5; color: #E2E8F0; margin: 0;"></p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 8px;">
+                    <h4 style="font-size: 12px; font-weight: 700; color: #34D399; margin: 0 0 6px 0;">Bull Case Catalysts</h4>
+                    <ul id="modalBullCase" style="margin: 0; padding-left: 14px; font-size: 12px; color: #CBD5E1; line-height: 1.5;"></ul>
+                </div>
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); padding: 12px; border-radius: 8px;">
+                    <h4 style="font-size: 12px; font-weight: 700; color: #F87171; margin: 0 0 6px 0;">Bear Case Risks</h4>
+                    <ul id="modalBearCase" style="margin: 0; padding-left: 14px; font-size: 12px; color: #CBD5E1; line-height: 1.5;"></ul>
+                </div>
+            </div>
+
+            <div>
+                <h4 style="font-size: 12px; font-weight: 700; color: #94A3B8; margin: 0 0 8px 0;">Verified Research Links</h4>
+                <div id="modalArticles" style="display: flex; flex-direction: column; gap: 6px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Financial Disclaimer Footer -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 14px 18px; border-radius: 12px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; margin-top: 10px;">
+    <strong>ℹ️ Financial Research Disclaimer:</strong> All market data, quote snapshots, and AI-generated insights are provided for educational and analytical research purposes only. They do not constitute investment advice or personalized securities recommendations.
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const moversData = {{ research.top_movers | tojson }};
+    const tableBody = document.getElementById('moversTableBody');
+
+    const tabGainers = document.getElementById('tabGainers');
+    const tabLosers = document.getElementById('tabLosers');
+    const tabActive = document.getElementById('tabActive');
+
+    const activeTabStyle = "padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background: var(--surface-hover); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;";
+    const inactiveTabStyle = "padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; color: var(--text-secondary); border: none; background: transparent; cursor: pointer;";
+
+    function renderMoversTable(items) {
+        if (!tableBody || !items) return;
+        tableBody.innerHTML = items.map(item => `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13.5px;">
+                <td style="padding: 12px 16px; font-weight: 700; color: #3B82F6;">${item.symbol}</td>
+                <td style="padding: 12px 16px; color: var(--text-primary);">${item.name}</td>
+                <td style="padding: 12px 16px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">$${item.price}</td>
+                <td style="padding: 12px 16px; text-align: right; color: ${item.status === 'up' ? '#34D399' : '#F87171'}; font-weight: 500;">
+                    ${item.status === 'up' ? '+' : ''}$${item.change}
+                </td>
+                <td style="padding: 12px 16px; text-align: right;">
+                    <span style="padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: ${item.status === 'up' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${item.status === 'up' ? '#34D399' : '#F87171'};">
+                        ${item.status === 'up' ? '+' : ''}${item.pct_change}%
+                    </span>
+                </td>
+                <td style="padding: 12px 16px; text-align: center;">
+                    <button onclick="runTickerResearch('${item.symbol}')" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #E2E8F0; padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;">
+                        AI Deep Dive
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    if (tabGainers) {
+        tabGainers.addEventListener('click', function() {
+            [tabGainers, tabLosers, tabActive].forEach(t => t.style.cssText = inactiveTabStyle);
+            tabGainers.style.cssText = activeTabStyle;
+            renderMoversTable(moversData.gainers);
+        });
+    }
+
+    if (tabLosers) {
+        tabLosers.addEventListener('click', function() {
+            [tabGainers, tabLosers, tabActive].forEach(t => t.style.cssText = inactiveTabStyle);
+            tabLosers.style.cssText = activeTabStyle;
+            renderMoversTable(moversData.losers);
+        });
+    }
+
+    if (tabActive) {
+        tabActive.addEventListener('click', function() {
+            [tabGainers, tabLosers, tabActive].forEach(t => t.style.cssText = inactiveTabStyle);
+            tabActive.style.cssText = activeTabStyle;
+            renderMoversTable(moversData.active);
+        });
+    }
+
+    // Modal Search Handlers
+    const searchBtn = document.getElementById('searchTickerBtn');
+    const inputEl = document.getElementById('tickerInput');
+    const modal = document.getElementById('tickerModal');
+    const closeModal = document.getElementById('closeModalBtn');
+
+    if (searchBtn && inputEl) {
+        searchBtn.addEventListener('click', function() {
+            const val = inputEl.value.trim();
+            if (val) runTickerResearch(val);
+        });
+        inputEl.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const val = inputEl.value.trim();
+                if (val) runTickerResearch(val);
+            }
+        });
+    }
+
+    if (closeModal) {
+        closeModal.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+    }
+});
+
+function runTickerResearch(ticker) {
+    const modal = document.getElementById('tickerModal');
+    const loading = document.getElementById('modalLoading');
+    const content = document.getElementById('modalContent');
+    
+    modal.style.display = 'flex';
+    loading.style.display = 'block';
+    content.style.display = 'none';
+
+    document.getElementById('modalTickerTitle').innerText = ticker.toUpperCase();
+
+    fetch(`/api/stock-market/ticker/${encodeURIComponent(ticker)}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('modalCompanyName').innerText = data.company_name;
+            document.getElementById('modalPrice').innerText = data.formatted_price || ('$' + data.current_price);
+            document.getElementById('modalPE').innerText = data.pe_ratio || 'N/A';
+            document.getElementById('modalMCap').innerText = data.market_cap || 'N/A';
+            document.getElementById('modalThesis').innerText = data.thesis;
+
+            document.getElementById('modalBullCase').innerHTML = (data.bull_case || []).map(b => `<li>${b}</li>`).join('');
+            document.getElementById('modalBearCase').innerHTML = (data.bear_case || []).map(b => `<li>${b}</li>`).join('');
+
+            document.getElementById('modalArticles').innerHTML = (data.articles || []).map(a => `
+                <a href="${a.url}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; color: #60A5FA; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.15);">
+                    <span>${a.title}</span>
+                    <span style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; color: #FFF;">${a.domain} ↗</span>
+                </a>
+            `).join('');
+
+            loading.style.display = 'none';
+            content.style.display = 'block';
+        })
+        .catch(err => {
+            console.error('Ticker research error:', err);
+            loading.innerText = 'Failed to fetch AI research for ticker.';
+        });
+}
+</script>
+{% endblock %}

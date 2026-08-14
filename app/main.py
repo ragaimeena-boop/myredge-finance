@@ -480,5 +480,43 @@ def log_credit_score(
     finally:
         conn.close()
 
+@app.get("/stock-market", response_class=HTMLResponse)
+def read_stock_market(request: Request):
+    """Stock Market Live Data & Daily AI Deep Research Dashboard view."""
+    from app.stock_market import generate_daily_ai_research
+    conn = get_connection()
+    try:
+        refreshed = request.query_params.get("refreshed")
+        research = generate_daily_ai_research(conn=conn)
+        return templates.TemplateResponse(request=request, name="stock_market.html", context={
+            "active_page": "stock_market",
+            "research": research,
+            "refreshed": refreshed
+        })
+    finally:
+        conn.close()
+
+@app.post("/api/stock-market/refresh")
+def trigger_stock_market_refresh():
+    """Trigger manual AI deep research refresh."""
+    from app.stock_market import generate_daily_ai_research
+    conn = get_connection()
+    try:
+        generate_daily_ai_research(conn=conn, force_refresh=True)
+        return RedirectResponse(url="/stock-market?refreshed=1", status_code=303)
+    finally:
+        conn.close()
+
+@app.get("/api/stock-market/ticker/{ticker}")
+def get_ticker_analysis(ticker: str):
+    """Get instant AI deep dive report for a given stock ticker."""
+    from app.stock_market import get_ticker_ai_deep_dive
+    conn = get_connection()
+    try:
+        return get_ticker_ai_deep_dive(ticker, conn=conn)
+    finally:
+        conn.close()
+
+
 
 
