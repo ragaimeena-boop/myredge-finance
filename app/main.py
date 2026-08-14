@@ -123,11 +123,16 @@ def read_dashboard(request: Request):
             tx_dict["formatted_amount"] = format_currency(tx_dict["amount_cents"])
             recent_txs.append(tx_dict)
 
+        sync_status = request.query_params.get("sync")
+        sync_error = request.query_params.get("sync_error")
+
         return templates.TemplateResponse(request=request, name="index.html", context={
             "active_page": "dashboard",
             "net_worth": net_worth,
             "monthly_report": monthly_report,
-            "recent_transactions": recent_txs
+            "recent_transactions": recent_txs,
+            "sync_status": sync_status,
+            "sync_error": sync_error
         })
     finally:
         conn.close()
@@ -324,5 +329,9 @@ def read_investments(request: Request):
 @app.post("/api/sync")
 def trigger_manual_sync():
     """Manual sync trigger endpoint."""
-    run_daily_sync()
-    return RedirectResponse(url="/", status_code=303)
+    try:
+        run_daily_sync()
+        return RedirectResponse(url="/?sync=success", status_code=303)
+    except Exception as e:
+        print(f"[SYNC ERROR] Manual sync failed: {e}")
+        return RedirectResponse(url=f"/?sync_error={e}", status_code=303)

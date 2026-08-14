@@ -11,3 +11,5 @@ __pycache__/
 .venv/
 venv/
 myredge-finance-dashboard.zip
+node_modules/
+
