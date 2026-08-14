@@ -21,6 +21,41 @@ def get_db() -> Generator[sqlite3.Connection, None, None]:
     finally:
         conn.close()
 
+def purge_demo_data(conn=None) -> dict:
+    """
+    Remove initial sample/demo accounts, holdings, snapshots, and transactions from database.
+    Returns count of purged records.
+    """
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    demo_acc_ids = ('acc_checking_01', 'acc_credit_01', 'acc_schwab_01', 'acc_transamerica_01')
+    demo_tx_ids = ('tx_001', 'tx_002', 'tx_003', 'tx_101', 'tx_102', 'tx_inv_01', 'tx_inv_02', 'tx_inv_03')
+
+    stats = {"transactions_deleted": 0, "accounts_deleted": 0}
+    try:
+        cursor = conn.cursor()
+        
+        tx_placeholders = ','.join(['?'] * len(demo_tx_ids))
+        acc_placeholders = ','.join(['?'] * len(demo_acc_ids))
+        
+        cursor.execute(f"DELETE FROM transactions WHERE id IN ({tx_placeholders}) OR account_id IN ({acc_placeholders});", (*demo_tx_ids, *demo_acc_ids))
+        stats["transactions_deleted"] = cursor.rowcount
+
+        cursor.execute(f"DELETE FROM holdings WHERE account_id IN ({acc_placeholders});", demo_acc_ids)
+        cursor.execute(f"DELETE FROM balance_snapshots WHERE account_id IN ({acc_placeholders});", demo_acc_ids)
+        cursor.execute(f"DELETE FROM accounts WHERE id IN ({acc_placeholders});", demo_acc_ids)
+        stats["accounts_deleted"] = cursor.rowcount
+
+        conn.commit()
+    finally:
+        if close_conn:
+            conn.close()
+
+    return stats
+
 def init_db():
     """Initialize database tables and seed default categories."""
     conn = get_connection()
@@ -179,42 +214,43 @@ def init_db():
                 VALUES (?, ?, ?, ?, 10);
                 """, (pattern, row["id"], clean_payee, is_trans))
 
-    # Seed Sample Investment Accounts & Holdings if empty
-    cursor.execute("SELECT COUNT(*) FROM accounts WHERE id IN ('acc_schwab_01', 'acc_transamerica_01');")
-    if cursor.fetchone()[0] == 0:
-        now_str = "2026-08-13T00:00:00-04:00"
-        inv_accounts = [
-            ("acc_schwab_01", "Charles Schwab Brokerage", "USD", 3485000, 3485000, "Charles Schwab", "schwab.com", now_str),
-            ("acc_transamerica_01", "Transamerica 401(k) Retirement", "USD", 8240000, 8240000, "Transamerica", "transamerica.com", now_str),
-        ]
-        cursor.executemany("""
-        INSERT OR IGNORE INTO accounts (id, name, currency, balance_cents, available_balance_cents, org_name, org_domain, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-        """, inv_accounts)
+    # Seed Sample Investment Accounts & Holdings if empty AND no SIMPLEFIN_ACCESS_URL configured
+    if not settings.SIMPLEFIN_ACCESS_URL:
+        cursor.execute("SELECT COUNT(*) FROM accounts WHERE id IN ('acc_schwab_01', 'acc_transamerica_01');")
+        if cursor.fetchone()[0] == 0:
+            now_str = "2026-08-13T00:00:00-04:00"
+            inv_accounts = [
+                ("acc_schwab_01", "Charles Schwab Brokerage", "USD", 3485000, 3485000, "Charles Schwab", "schwab.com", now_str),
+                ("acc_transamerica_01", "Transamerica 401(k) Retirement", "USD", 8240000, 8240000, "Transamerica", "transamerica.com", now_str),
+            ]
+            cursor.executemany("""
+            INSERT OR IGNORE INTO accounts (id, name, currency, balance_cents, available_balance_cents, org_name, org_domain, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, inv_accounts)
 
-        schwab_holdings = [
-            ("acc_schwab_01", "VOO", "Vanguard S&P 500 ETF", "ETF", 25.0, 1150000, now_str),
-            ("acc_schwab_01", "NVDA", "NVIDIA Corporation", "Stock", 30.0, 320000, now_str),
-            ("acc_schwab_01", "AAPL", "Apple Inc", "Stock", 25.0, 420000, now_str),
-            ("acc_schwab_01", "MSFT", "Microsoft Corporation", "Stock", 15.0, 580000, now_str),
-            ("acc_schwab_01", "TSLA", "Tesla Inc", "Stock", 20.0, 410000, now_str),
-            ("acc_transamerica_01", "TRP2055", "Transamerica Target 2055 Retirement Fund", "Retirement 401(k)", 500.0, 8240000, now_str),
-        ]
-        cursor.executemany("""
-        INSERT OR IGNORE INTO holdings (account_id, ticker, name, asset_type, shares, cost_basis_cents, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?);
-        """, schwab_holdings)
+            schwab_holdings = [
+                ("acc_schwab_01", "VOO", "Vanguard S&P 500 ETF", "ETF", 25.0, 1150000, now_str),
+                ("acc_schwab_01", "NVDA", "NVIDIA Corporation", "Stock", 30.0, 320000, now_str),
+                ("acc_schwab_01", "AAPL", "Apple Inc", "Stock", 25.0, 420000, now_str),
+                ("acc_schwab_01", "MSFT", "Microsoft Corporation", "Stock", 15.0, 580000, now_str),
+                ("acc_schwab_01", "TSLA", "Tesla Inc", "Stock", 20.0, 410000, now_str),
+                ("acc_transamerica_01", "TRP2055", "Transamerica Target 2055 Retirement Fund", "Retirement 401(k)", 500.0, 8240000, now_str),
+            ]
+            cursor.executemany("""
+            INSERT OR IGNORE INTO holdings (account_id, ticker, name, asset_type, shares, cost_basis_cents, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
+            """, schwab_holdings)
 
-        # Seed sample investment transactions
-        inv_txs = [
-            ("tx_inv_01", "acc_schwab_01", "2026-08-05", 1785936000, 12550, "QUALIFIED DIVIDEND VANGUARD S&P 500 ETF", "Vanguard", "Quarterly dividend payout", 0, 2, 0, now_str, now_str),
-            ("tx_inv_02", "acc_transamerica_01", "2026-08-01", 1785590400, 75000, "EMPLOYER MATCH 401K CONTRIBUTION", "Transamerica", "Biweekly 401k match", 0, 1, 0, now_str, now_str),
-            ("tx_inv_03", "acc_schwab_01", "2026-07-28", 1785244800, -45000, "BUY 1.0 SHARE NVDA AT 450.00", "Charles Schwab", "Stock purchase", 0, 2, 0, now_str, now_str),
-        ]
-        cursor.executemany("""
-        INSERT OR IGNORE INTO transactions (id, account_id, posted_at, posted_timestamp, amount_cents, description, payee, memo, pending, category_id, is_transfer, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """, inv_txs)
+            # Seed sample investment transactions
+            inv_txs = [
+                ("tx_inv_01", "acc_schwab_01", "2026-08-05", 1785936000, 12550, "QUALIFIED DIVIDEND VANGUARD S&P 500 ETF", "Vanguard", "Quarterly dividend payout", 0, 2, 0, now_str, now_str),
+                ("tx_inv_02", "acc_transamerica_01", "2026-08-01", 1785590400, 75000, "EMPLOYER MATCH 401K CONTRIBUTION", "Transamerica", "Biweekly 401k match", 0, 1, 0, now_str, now_str),
+                ("tx_inv_03", "acc_schwab_01", "2026-07-28", 1785244800, -45000, "BUY 1.0 SHARE NVDA AT 450.00", "Charles Schwab", "Stock purchase", 0, 2, 0, now_str, now_str),
+            ]
+            cursor.executemany("""
+            INSERT OR IGNORE INTO transactions (id, account_id, posted_at, posted_timestamp, amount_cents, description, payee, memo, pending, category_id, is_transfer, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, inv_txs)
 
     conn.commit()
     conn.close()

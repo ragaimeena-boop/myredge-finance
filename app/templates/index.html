@@ -27,6 +27,21 @@
 </div>
 {% endif %}
 
+{% if demo_purged %}
+<div class="alert alert-success" style="background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.4); color: #2ecc71; padding: 14px 18px; border-radius: 10px; margin-bottom: 24px; font-weight: 500;">
+    ✓ Initial demo mock data has been purged from your database.
+</div>
+{% elif has_demo_data %}
+<div class="alert alert-info" style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.4); color: #60A5FA; padding: 12px 18px; border-radius: 10px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+    <div>
+        💡 <strong>Demo Data Detected:</strong> Sample mock accounts (e.g. Everyday Checking, Schwab Brokerage) exist in your database alongside your live SimpleFIN data.
+    </div>
+    <form action="/api/purge-demo" method="post" style="margin: 0;">
+        <button type="submit" class="btn" style="background: #2563EB; color: #FFFFFF; border: none; padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap;">Clear Demo Data</button>
+    </form>
+</div>
+{% endif %}
+
 <!-- Key Financial Cards -->
 <div class="grid-4">
     <div class="card">

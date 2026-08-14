@@ -10,7 +10,7 @@ import pytz
 from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.database import init_db, get_connection
+from app.database import init_db, get_connection, purge_demo_data
 from app.utils import get_eastern_tz, current_eastern_time, format_currency
 from app.models import SimpleFINResponse
 from app.simplefin import SimpleFINClient, ingest_simplefin_data
@@ -31,6 +31,7 @@ def run_daily_sync():
     conn = get_connection()
     try:
         if settings.SIMPLEFIN_ACCESS_URL:
+            purge_demo_data(conn=conn)
             client = SimpleFINClient()
             data = client.fetch_data()
         else:
@@ -123,8 +124,12 @@ def read_dashboard(request: Request):
             tx_dict["formatted_amount"] = format_currency(tx_dict["amount_cents"])
             recent_txs.append(tx_dict)
 
+        cursor.execute("SELECT COUNT(*) FROM accounts WHERE id IN ('acc_checking_01', 'acc_credit_01', 'acc_schwab_01', 'acc_transamerica_01');")
+        has_demo_data = (cursor.fetchone()[0] > 0)
+
         sync_status = request.query_params.get("sync")
         sync_error = request.query_params.get("sync_error")
+        demo_purged = request.query_params.get("demo_purged")
 
         return templates.TemplateResponse(request=request, name="index.html", context={
             "active_page": "dashboard",
@@ -132,7 +137,9 @@ def read_dashboard(request: Request):
             "monthly_report": monthly_report,
             "recent_transactions": recent_txs,
             "sync_status": sync_status,
-            "sync_error": sync_error
+            "sync_error": sync_error,
+            "has_demo_data": has_demo_data,
+            "demo_purged": demo_purged
         })
     finally:
         conn.close()
@@ -335,3 +342,14 @@ def trigger_manual_sync():
     except Exception as e:
         print(f"[SYNC ERROR] Manual sync failed: {e}")
         return RedirectResponse(url=f"/?sync_error={e}", status_code=303)
+
+@app.post("/api/purge-demo")
+def trigger_purge_demo():
+    """Manually purge initial sample/demo accounts and transactions from the database."""
+    conn = get_connection()
+    try:
+        purge_demo_data(conn=conn)
+    finally:
+        conn.close()
+    return RedirectResponse(url="/?demo_purged=1", status_code=303)
+

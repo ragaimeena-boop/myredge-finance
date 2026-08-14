@@ -31,3 +31,13 @@ def test_database_initialization(temp_db):
     # Check rules seeded
     cursor.execute("SELECT COUNT(*) FROM rules;")
     assert cursor.fetchone()[0] > 0
+
+def test_purge_demo_data(temp_db):
+    from app.database import purge_demo_data
+    stats = purge_demo_data(conn=temp_db)
+    assert stats["accounts_deleted"] >= 0
+    
+    cursor = temp_db.cursor()
+    cursor.execute("SELECT COUNT(*) FROM accounts WHERE id IN ('acc_schwab_01', 'acc_transamerica_01', 'acc_checking_01', 'acc_credit_01');")
+    assert cursor.fetchone()[0] == 0
+
