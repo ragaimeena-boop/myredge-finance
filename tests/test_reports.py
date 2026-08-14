@@ -44,6 +44,12 @@ def test_reports_generation(populated_db):
     assert m_report["expense_cents"] == 16570
     assert m_report["income_cents"] == 320000
     assert m_report["savings_rate_pct"] > 0
+    assert "rolling_6_months" in m_report
+    assert len(m_report["rolling_6_months"]) == 6
+    curr_m = [m for m in m_report["rolling_6_months"] if m["is_current"]][0]
+    assert curr_m["income_cents"] == 320000
+    assert curr_m["total_expense_cents"] == 16570
+    assert curr_m["bills_cents"] + curr_m["spending_cents"] == curr_m["total_expense_cents"]
 
     # Test yearly report query
     y_report = generate_yearly_report(2023, conn=populated_db)

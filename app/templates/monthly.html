@@ -10,7 +10,7 @@
     </div>
 </div>
 
-<div class="grid-4">
+<div class="grid-4" style="margin-bottom: 28px;">
     <div class="card">
         <div class="card-title">Total Monthly Income</div>
         <div class="hero-number income num">{{ report.formatted_income }}</div>
@@ -36,6 +36,25 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- 6-Month Rolling Trend Chart Card (Patterned after Screenshot 2) -->
+<div class="card" style="margin-bottom: 28px; background-color: var(--surface-color); border-radius: 14px; border: 1px solid var(--border-color); padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <h2 style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0;">Spending & Income Trend</h2>
+            <div class="subtext" style="margin-top: 4px;">6-month rolling breakdown • Income vs. Spending & Bills</div>
+        </div>
+        <div style="display: flex; gap: 6px; background: rgba(255, 255, 255, 0.04); padding: 4px; border-radius: 20px; border: 1px solid var(--border-color);">
+            <span style="padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary);">Last Month</span>
+            <span style="padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; background: var(--surface-hover); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1);">This Month</span>
+            <span style="padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary);">6-Mo Rolling</span>
+        </div>
+    </div>
+    
+    <div style="position: relative; height: 320px; width: 100%;">
+        <canvas id="rollingTrendChart"></canvas>
+    </div>
+</div>
 
 <div class="grid-2" style="margin-bottom: 28px;">
     <div class="card">
@@ -81,7 +100,8 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const ctx = document.getElementById('monthlyCategoryChart').getContext('2d');
+    // 1. Expense Distribution Pie Chart
+    const ctxPie = document.getElementById('monthlyCategoryChart').getContext('2d');
     
     const categoryLabels = [
         {% for cat in report.categories %}
@@ -103,7 +123,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const isMobile = window.innerWidth < 768;
 
-    new Chart(ctx, {
+    new Chart(ctxPie, {
         type: 'pie',
         data: {
             labels: categoryLabels,
@@ -128,6 +148,161 @@ document.addEventListener("DOMContentLoaded", function() {
                             let label = context.label || '';
                             let value = context.parsed || 0;
                             return label + ': $' + value.toLocaleString('en-US', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 2. 6-Month Rolling Trend Chart
+    const ctxRolling = document.getElementById('rollingTrendChart').getContext('2d');
+    
+    const rollingLabels = [
+        {% for item in report.rolling_6_months %}
+        "{{ item.month_short }}"{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    const rollingFullMonths = [
+        {% for item in report.rolling_6_months %}
+        "{{ item.full_month }}"{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const incomeData = [
+        {% for item in report.rolling_6_months %}
+        {{ item.income_dollars }}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const spendingData = [
+        {% for item in report.rolling_6_months %}
+        {{ item.spending_dollars }}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const billsData = [
+        {% for item in report.rolling_6_months %}
+        {{ item.bills_dollars }}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    let currentMonthIdx = 5;
+    {% for item in report.rolling_6_months %}
+    {% if item.is_current %}
+    currentMonthIdx = {{ loop.index0 }};
+    {% endif %}
+    {% endfor %}
+
+    new Chart(ctxRolling, {
+        type: 'bar',
+        data: {
+            labels: rollingLabels,
+            datasets: [
+                {
+                    label: 'Income',
+                    data: incomeData,
+                    backgroundColor: '#2563EB',
+                    hoverBackgroundColor: '#3B82F6',
+                    stack: 'incomeStack',
+                    barPercentage: 0.55,
+                    categoryPercentage: 0.45,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Spending',
+                    data: spendingData,
+                    backgroundColor: '#60A5FA',
+                    hoverBackgroundColor: '#93C5FD',
+                    stack: 'expenseStack',
+                    barPercentage: 0.55,
+                    categoryPercentage: 0.45,
+                    borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 }
+                },
+                {
+                    label: 'Bills & Utilities',
+                    data: billsData,
+                    backgroundColor: '#1E293B',
+                    hoverBackgroundColor: '#334155',
+                    stack: 'expenseStack',
+                    barPercentage: 0.55,
+                    categoryPercentage: 0.45,
+                    borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 }
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'nearest',
+                intersect: true
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    align: 'end',
+                    labels: {
+                        color: '#94A3B8',
+                        usePointStyle: true,
+                        boxWidth: 8,
+                        padding: 16,
+                        font: { size: 12, weight: '600' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#0F172A',
+                    titleColor: '#F8FAFC',
+                    bodyColor: '#E2E8F0',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 13 },
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            if (!tooltipItems.length) return '';
+                            const idx = tooltipItems[0].dataIndex;
+                            return rollingFullMonths[idx] || tooltipItems[0].label;
+                        },
+                        label: function(context) {
+                            let categoryName = context.dataset.label || '';
+                            let rawValue = context.parsed.y || 0;
+                            let formattedVal = '$' + rawValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            return categoryName + ': ' + formattedVal;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color: function(context) {
+                            return (context.index === currentMonthIdx) ? '#F8FAFC' : '#94A3B8';
+                        },
+                        font: function(context) {
+                            return {
+                                size: 13,
+                                weight: (context.index === currentMonthIdx) ? '700' : '500'
+                            };
+                        }
+                    }
+                },
+                y: {
+                    stacked: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: {
+                        color: '#94A3B8',
+                        font: { size: 12 },
+                        callback: function(value) {
+                            if (value >= 1000) {
+                                return '$' + (value / 1000).toFixed(1) + 'k';
+                            }
+                            return '$' + value;
                         }
                     }
                 }

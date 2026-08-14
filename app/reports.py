@@ -217,6 +217,65 @@ def generate_monthly_report(year: int, month: int, conn=None) -> Dict[str, Any]:
         # Month string e.g. "August 2026"
         month_name = date(year, month, 1).strftime("%B %Y")
 
+        # Rolling 6-Month Income vs Spending / Bills & Utilities Breakdown
+        rolling_6_months = []
+        for i in range(5, -1, -1):
+            target_m = month - i
+            target_y = year
+            while target_m <= 0:
+                target_m += 12
+                target_y -= 1
+            
+            r_start, r_end = get_date_bounds_for_month(target_y, target_m)
+            
+            # Income (non-transfer positive)
+            cursor.execute("""
+            SELECT SUM(amount_cents) FROM transactions
+            WHERE posted_at >= ? AND posted_at <= ? AND is_transfer = 0 AND amount_cents > 0;
+            """, (r_start, r_end))
+            r_income_cents = cursor.fetchone()[0] or 0
+
+            # Bills & Utilities expenses (Housing group or specific bills categories)
+            cursor.execute("""
+            SELECT SUM(ABS(t.amount_cents)) FROM transactions t
+            LEFT JOIN categories c ON t.category_id = c.id
+            WHERE t.posted_at >= ? AND t.posted_at <= ? AND t.is_transfer = 0 AND t.amount_cents < 0
+              AND (c.group_name = 'Housing' OR c.name IN ('Utilities', 'Data/Tele', 'Mortgage & Rent', 'Subscriptions & Recurring', 'Auto Payment & Insurance', 'Medical & Healthcare'));
+            """, (r_start, r_end))
+            r_bills_cents = cursor.fetchone()[0] or 0
+
+            # General Spending expenses (all other non-transfer expenses)
+            cursor.execute("""
+            SELECT SUM(ABS(t.amount_cents)) FROM transactions t
+            LEFT JOIN categories c ON t.category_id = c.id
+            WHERE t.posted_at >= ? AND t.posted_at <= ? AND t.is_transfer = 0 AND t.amount_cents < 0
+              AND (c.group_name IS NULL OR (c.group_name != 'Housing' AND c.name NOT IN ('Utilities', 'Data/Tele', 'Mortgage & Rent', 'Subscriptions & Recurring', 'Auto Payment & Insurance', 'Medical & Healthcare')));
+            """, (r_start, r_end))
+            r_spending_cents = cursor.fetchone()[0] or 0
+
+            r_total_expense_cents = r_bills_cents + r_spending_cents
+
+            dt_obj = date(target_y, target_m, 1)
+            rolling_6_months.append({
+                "month_short": dt_obj.strftime("%b"),
+                "full_month": dt_obj.strftime("%B %Y"),
+                "year": target_y,
+                "month": target_m,
+                "income_cents": r_income_cents,
+                "income_dollars": round(r_income_cents / 100.0, 2),
+                "formatted_income": format_currency(r_income_cents),
+                "bills_cents": r_bills_cents,
+                "bills_dollars": round(r_bills_cents / 100.0, 2),
+                "formatted_bills": format_currency(r_bills_cents),
+                "spending_cents": r_spending_cents,
+                "spending_dollars": round(r_spending_cents / 100.0, 2),
+                "formatted_spending": format_currency(r_spending_cents),
+                "total_expense_cents": r_total_expense_cents,
+                "total_expense_dollars": round(r_total_expense_cents / 100.0, 2),
+                "formatted_total_expense": format_currency(r_total_expense_cents),
+                "is_current": (target_y == year and target_m == month)
+            })
+
         return {
             "period_type": "monthly",
             "year": year,
@@ -232,7 +291,8 @@ def generate_monthly_report(year: int, month: int, conn=None) -> Dict[str, Any]:
             "formatted_net_flow": format_currency(net_cents),
             "savings_rate_pct": savings_rate,
             "categories": categories,
-            "income_categories": income_categories
+            "income_categories": income_categories,
+            "rolling_6_months": rolling_6_months
         }
     finally:
         if close_conn:
