@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Credit Score & Credit Health - Personal Finance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Credit Score & Credit Health Radar</h1>
+        <div class="page-subtitle">Track FICO/VantageScore trajectory, credit utilization ratio, and free bureau portals</div>
+    </div>
+</div>
+
+{% if logged %}
+<div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--income-color); background: rgba(16, 185, 129, 0.08);">
+    <div style="color: var(--income-color); font-weight: 600;">✓ New credit score check recorded successfully!</div>
+</div>
+{% endif %}
+
+<div class="grid-4" style="margin-bottom: 28px;">
+    <div class="card">
+        <div class="card-title">Latest Credit Score</div>
+        <div class="hero-number income num">{{ summary.current_score }}</div>
+        <div class="subtext">{{ summary.latest_bureau }} • {{ summary.latest_date }}</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Credit Rating Tier</div>
+        <div style="font-size: 26px; font-weight: 700; color: {{ summary.rating_color }}; margin-bottom: 4px;">
+            {{ summary.rating_label }}
+        </div>
+        <div class="subtext">Scale: 300 to 850</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Credit Card Utilization</div>
+        <div class="hero-number num {% if summary.utilization_pct <= 30.0 %}income{% else %}expense{% endif %}">
+            {{ summary.utilization_pct }}%
+        </div>
+        <div class="subtext">{{ summary.formatted_cc_balance }} of {{ summary.formatted_cc_limit }} limit</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Score Checks Recorded</div>
+        <div class="hero-number num" style="color: var(--accent-color);">{{ summary.history | length }}</div>
+        <div class="subtext">Total logged score snapshots</div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Credit Score History Trajectory Line Chart -->
+<div class="card" style="margin-bottom: 28px; background-color: var(--surface-color); border-radius: 14px; border: 1px solid var(--border-color); padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+        <div>
+            <h2 style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0;">Credit Score Trajectory</h2>
+            <div class="subtext" style="margin-top: 4px;">Historical FICO & VantageScore trajectory over time</div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="badge badge-income" style="font-size: 13px; background: rgba(16, 185, 129, 0.15); color: #10B981;">Target: 740+ (Very Good)</span>
+        </div>
+    </div>
+    
+    <div style="position: relative; height: 300px; width: 100%;">
+        <canvas id="creditScoreChart"></canvas>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom: 28px;">
+    <!-- Log New Score Snapshot Form -->
+    <div class="card">
+        <div class="card-title">Log New Credit Score Check</div>
+        <form action="/api/credit-score" method="POST" style="display: flex; flex-direction: column; gap: 14px; margin-top: 12px;">
+            <div>
+                <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Credit Score (300 - 850)</label>
+                <input type="number" name="score" min="300" max="850" placeholder="e.g. 780" required
+                       style="width: 100%; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 15px;">
+            </div>
+            
+            <div>
+                <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Bureau / Credit Model</label>
+                <select name="bureau" style="width: 100%; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 14px;">
+                    <option value="Experian FICO 8">Experian FICO 8</option>
+                    <option value="TransUnion Vantage 3.0">TransUnion Vantage 3.0</option>
+                    <option value="Equifax FICO 8">Equifax FICO 8</option>
+                    <option value="Chase Credit Journey">Chase Credit Journey</option>
+                    <option value="Capital One CreditWise">Capital One CreditWise</option>
+                    <option value="Other">Other / FICO Score</option>
+                </select>
+            </div>
+
+            <div>
+                <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Date Recorded</label>
+                <input type="date" name="recorded_date" style="width: 100%; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
+
+            <div>
+                <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Notes / Reason</label>
+                <input type="text" name="notes" placeholder="e.g. Paid down card, balance update" 
+                       style="width: 100%; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 14px;">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top: 8px; justify-content: center; width: 100%;">
+                + Save Credit Score Snapshot
+            </button>
+        </form>
+    </div>
+
+    <!-- Free Bureau Quick Links & Resources -->
+    <div class="card">
+        <div class="card-title">Free Credit Score Portals & Direct Links</div>
+        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; margin-top: 4px;">
+            Check your official live score for free without impacting your credit score:
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <a href="https://www.chase.com/personal/credit-cards/free-credit-score" target="_blank" rel="noopener" class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; text-decoration: none; background: var(--surface-hover); border-color: var(--border-color);">
+                <div>
+                    <strong style="color: var(--text-primary);">Chase Credit Journey</strong>
+                    <div class="subtext">Free VantageScore 3.0 & weekly alerts</div>
+                </div>
+                <span class="institution-link">Check Score ↗</span>
+            </a>
+            
+            <a href="https://creditwise.capitalone.com" target="_blank" rel="noopener" class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; text-decoration: none; background: var(--surface-hover); border-color: var(--border-color);">
+                <div>
+                    <strong style="color: var(--text-primary);">Capital One CreditWise</strong>
+                    <div class="subtext">Free score tracking & TransUnion alerts</div>
+                </div>
+                <span class="institution-link">Check Score ↗</span>
+            </a>
+
+            <a href="https://www.experian.com/consumer-products/free-credit-score.html" target="_blank" rel="noopener" class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; text-decoration: none; background: var(--surface-hover); border-color: var(--border-color);">
+                <div>
+                    <strong style="color: var(--text-primary);">Experian Official Free FICO Score</strong>
+                    <div class="subtext">Direct monthly Experian FICO 8 score</div>
+                </div>
+                <span class="institution-link">Check Score ↗</span>
+            </a>
+
+            <a href="https://www.annualcreditreport.com" target="_blank" rel="noopener" class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; text-decoration: none; background: var(--surface-hover); border-color: var(--border-color);">
+                <div>
+                    <strong style="color: var(--text-primary);">AnnualCreditReport.com</strong>
+                    <div class="subtext">Official US federal free annual credit reports</div>
+                </div>
+                <span class="institution-link">Check Report ↗</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Score History Log Table -->
+<div class="card">
+    <div class="card-title" style="margin-bottom: 16px;">Credit Score History Log</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date Recorded</th>
+                    <th>Bureau / Model</th>
+                    <th>Score</th>
+                    <th>Rating Classification</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in summary.history %}
+                <tr>
+                    <td class="num">{{ item.recorded_date }}</td>
+                    <td><strong>{{ item.bureau }}</strong></td>
+                    <td class="num" style="font-weight: 700; font-size: 16px; color: var(--accent-color);">
+                        {{ item.score }}
+                    </td>
+                    <td>
+                        <span class="badge {% if item.score >= 740 %}badge-income{% elif item.score >= 670 %}badge-income{% else %}badge-expense{% endif %}">
+                            {% if item.score >= 800 %}Exceptional{% elif item.score >= 740 %}Very Good{% elif item.score >= 670 %}Good{% elif item.score >= 580 %}Fair{% else %}Poor{% endif %}
+                        </span>
+                    </td>
+                    <td class="subtext">{{ item.notes or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="subtext" style="text-align: center;">No credit score logs recorded yet. Use the form above to add your first score!</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const ctx = document.getElementById('creditScoreChart').getContext('2d');
+    
+    const dates = [
+        {% for item in summary.history | reverse %}
+        "{{ item.recorded_date }}"{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const scores = [
+        {% for item in summary.history | reverse %}
+        {{ item.score }}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Credit Score',
+                data: scores,
+                borderColor: '#38BDF8',
+                backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointBackgroundColor: '#38BDF8',
+                pointBorderColor: '#0F1115',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0F172A',
+                    titleColor: '#F8FAFC',
+                    bodyColor: '#E2E8F0',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    padding: 12,
+                    callbacks: {
+                        label: function(context) {
+                            return 'Score: ' + context.parsed.y;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94A3B8', font: { size: 12 } }
+                },
+                y: {
+                    min: 500,
+                    max: 850,
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94A3B8', font: { size: 12 } }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

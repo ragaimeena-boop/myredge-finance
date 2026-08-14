@@ -3,7 +3,22 @@ import pytest
 from app.database import init_db
 from app.models import SimpleFINResponse
 from app.simplefin import ingest_simplefin_data
-from app.reports import generate_weekly_report, generate_monthly_report, generate_yearly_report, calculate_net_worth
+from app.reports import generate_weekly_report, generate_monthly_report, generate_yearly_report, calculate_net_worth, get_credit_score_summary
+
+def test_credit_score_summary(populated_db):
+    cs = get_credit_score_summary(conn=populated_db)
+    assert "current_score" in cs
+    assert cs["current_score"] >= 300
+    assert "rating_label" in cs
+    assert "history" in cs
+    assert len(cs["history"]) >= 1
+
+def test_legal_category_seeding(populated_db):
+    cursor = populated_db.cursor()
+    cursor.execute("SELECT * FROM categories WHERE name = 'Legal & Professional';")
+    row = cursor.fetchone()
+    assert row is not None
+    assert row["group_name"] == "Services"
 from pathlib import Path
 import json
 

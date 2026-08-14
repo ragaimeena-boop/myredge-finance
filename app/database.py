@@ -159,6 +159,18 @@ def init_db():
     );
     """)
 
+    # Credit Scores table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS credit_scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        score INTEGER NOT NULL,
+        bureau TEXT NOT NULL DEFAULT 'VantageScore 3.0',
+        recorded_date TEXT NOT NULL,
+        notes TEXT,
+        created_at TEXT NOT NULL
+    );
+    """)
+
     # Seed Default Categories (INSERT OR IGNORE to add new categories safely)
     default_categories = [
         # Income
@@ -187,6 +199,7 @@ def init_db():
         ("Travel", "Lifestyle", "plane", "#38BDF8", 0, 0),
         ("Subscriptions & Recurring", "Lifestyle", "repeat", "#F472B6", 0, 0),
         ("Medical & Healthcare", "Healthcare", "heart", "#06B6D4", 0, 0),
+        ("Legal & Professional", "Services", "file-text", "#A855F7", 0, 0),
 
         # Transfers & Financial
         ("Credit Card Payment", "Transfers", "credit-card", "#64748B", 0, 1),
@@ -313,6 +326,14 @@ def init_db():
         ("FLORIDA POWER", "Utilities", "Florida Power & Light", 0),
         ("FPL", "Utilities", "Florida Power & Light", 0),
         ("DUKE ENERGY", "Utilities", "Duke Energy", 0),
+
+        # Legal & Professional Services
+        ("ATTORNEY", "Legal & Professional", None, 0),
+        ("LAWYER", "Legal & Professional", None, 0),
+        ("LEGAL", "Legal & Professional", None, 0),
+        ("LAW OFFICE", "Legal & Professional", None, 0),
+        ("NOTARY", "Legal & Professional", None, 0),
+        ("COURT", "Legal & Professional", None, 0),
     ]
     
     for pattern, cat_name, clean_payee, is_trans in default_rules:
@@ -329,6 +350,20 @@ def init_db():
     # Re-apply rules against any existing Uncategorized transactions
     from app.simplefin import reapply_rules_to_uncategorized
     reapply_rules_to_uncategorized(conn=conn)
+
+    # Seed Sample Credit Scores if table is empty
+    cursor.execute("SELECT COUNT(*) FROM credit_scores;")
+    if cursor.fetchone()[0] == 0:
+        sample_scores = [
+            (740, "Experian FICO 8", "2026-03-15", "Baseline credit check", "2026-03-15T00:00:00-04:00"),
+            (752, "TransUnion Vantage 3.0", "2026-05-10", "Paid down credit card balance", "2026-05-10T00:00:00-04:00"),
+            (768, "Equifax FICO 8", "2026-07-01", "Credit limit increase approved", "2026-07-01T00:00:00-04:00"),
+            (782, "Experian FICO 8", "2026-08-10", "Latest monthly score refresh - Excellent", "2026-08-10T00:00:00-04:00"),
+        ]
+        cursor.executemany("""
+        INSERT INTO credit_scores (score, bureau, recorded_date, notes, created_at)
+        VALUES (?, ?, ?, ?, ?);
+        """, sample_scores)
 
     # Seed Sample Investment Accounts & Holdings if empty AND no SIMPLEFIN_ACCESS_URL configured
     if not settings.SIMPLEFIN_ACCESS_URL:

@@ -615,3 +615,79 @@ def get_investments_summary(conn=None) -> Dict[str, Any]:
     finally:
         if close_conn:
             conn.close()
+
+def get_credit_score_summary(conn=None) -> Dict[str, Any]:
+    """Fetch credit score history, rating classification, and credit card utilization analytics."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM credit_scores ORDER BY recorded_date DESC, id DESC;")
+        history = [dict(row) for row in cursor.fetchall()]
+
+        current_score = history[0]["score"] if history else 750
+        latest_bureau = history[0]["bureau"] if history else "FICO 8"
+        latest_date = history[0]["recorded_date"] if history else "N/A"
+
+        # Determine credit rating tier
+        if current_score >= 800:
+            rating_label = "Exceptional"
+            rating_color = "#10B981"
+            rating_badge = "badge-income"
+        elif current_score >= 740:
+            rating_label = "Very Good"
+            rating_color = "#059669"
+            rating_badge = "badge-income"
+        elif current_score >= 670:
+            rating_label = "Good"
+            rating_color = "#34D399"
+            rating_badge = "badge-income"
+        elif current_score >= 580:
+            rating_label = "Fair"
+            rating_color = "#F59E0B"
+            rating_badge = "badge-expense"
+        else:
+            rating_label = "Poor"
+            rating_color = "#EF4444"
+            rating_badge = "badge-expense"
+
+        # Calculate live Credit Card Utilization Ratio across credit accounts
+        cursor.execute("""
+        SELECT balance_cents, available_balance_cents 
+        FROM accounts 
+        WHERE account_type = 'credit_card' OR name LIKE '%Credit%' OR name LIKE '%Card%';
+        """)
+        cc_rows = cursor.fetchall()
+        total_cc_balance_cents = 0
+        total_cc_limit_cents = 0
+
+        for row in cc_rows:
+            bal = abs(row["balance_cents"] or 0)
+            avail = row["available_balance_cents"] or 0
+            total_cc_balance_cents += bal
+            # Estimate limit = balance + available balance if available_balance is provided
+            limit = bal + avail if avail > 0 else max(bal * 2, 500000)
+            total_cc_limit_cents += limit
+
+        utilization_pct = 0.0
+        if total_cc_limit_cents > 0:
+            utilization_pct = round((total_cc_balance_cents / total_cc_limit_cents) * 100, 1)
+
+        return {
+            "current_score": current_score,
+            "latest_bureau": latest_bureau,
+            "latest_date": latest_date,
+            "rating_label": rating_label,
+            "rating_color": rating_color,
+            "rating_badge": rating_badge,
+            "utilization_pct": utilization_pct,
+            "formatted_cc_balance": format_currency(total_cc_balance_cents),
+            "formatted_cc_limit": format_currency(total_cc_limit_cents),
+            "history": history
+        }
+    finally:
+        if close_conn:
+            conn.close()

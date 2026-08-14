@@ -20,6 +20,7 @@ from app.reports import (
     generate_yearly_report,
     calculate_net_worth,
     get_subscriptions_summary,
+    get_credit_score_summary,
     get_date_bounds_for_week
 )
 
@@ -440,5 +441,44 @@ def update_account_type(account_id: str, request: Request, account_type: str = F
         return RedirectResponse(url="/accounts?updated=1", status_code=303)
     finally:
         conn.close()
+
+@app.get("/credit-score", response_class=HTMLResponse)
+def read_credit_score(request: Request):
+    """Credit Score & Credit History Dashboard view."""
+    conn = get_connection()
+    try:
+        summary = get_credit_score_summary(conn=conn)
+        logged = request.query_params.get("logged")
+        return templates.TemplateResponse(request=request, name="credit_score.html", context={
+            "active_page": "credit_score",
+            "summary": summary,
+            "logged": logged
+        })
+    finally:
+        conn.close()
+
+@app.post("/api/credit-score")
+def log_credit_score(
+    score: int = Form(...),
+    bureau: str = Form(default="Experian FICO 8"),
+    recorded_date: str = Form(default=""),
+    notes: str = Form(default="")
+):
+    """Log a new credit score check into the history database."""
+    conn = get_connection()
+    now_str = current_eastern_time().isoformat()
+    rec_date = recorded_date.strip() if recorded_date and recorded_date.strip() else current_eastern_time().strftime("%Y-%m-%d")
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO credit_scores (score, bureau, recorded_date, notes, created_at)
+        VALUES (?, ?, ?, ?, ?);
+        """, (score, bureau, rec_date, notes, now_str))
+        conn.commit()
+
+        return RedirectResponse(url="/credit-score?logged=1", status_code=303)
+    finally:
+        conn.close()
+
 
 

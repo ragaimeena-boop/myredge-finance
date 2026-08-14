@@ -42,12 +42,12 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
         <div>
             <h2 style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0;">Spending & Income Trend</h2>
-            <div class="subtext" style="margin-top: 4px;">6-month rolling breakdown • Income vs. Spending & Bills</div>
+            <div class="subtext" style="margin-top: 4px;">Interactive breakdown • Income vs. Spending & Bills</div>
         </div>
         <div style="display: flex; gap: 6px; background: rgba(255, 255, 255, 0.04); padding: 4px; border-radius: 20px; border: 1px solid var(--border-color);">
-            <span style="padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary);">Last Month</span>
-            <span style="padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; background: var(--surface-hover); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1);">This Month</span>
-            <span style="padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary);">6-Mo Rolling</span>
+            <span id="pillLastMonth" style="padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;">Last Month</span>
+            <span id="pillThisMonth" style="padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;">This Month</span>
+            <span id="pill6Mo" style="padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 600; background: var(--surface-hover); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: all 0.2s;">6-Mo Rolling</span>
         </div>
     </div>
     
@@ -195,7 +195,9 @@ document.addEventListener("DOMContentLoaded", function() {
     {% endif %}
     {% endfor %}
 
-    new Chart(ctxRolling, {
+    let lastMonthIdx = currentMonthIdx > 0 ? currentMonthIdx - 1 : 0;
+
+    const trendChart = new Chart(ctxRolling, {
         type: 'bar',
         data: {
             labels: rollingLabels,
@@ -223,8 +225,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 {
                     label: 'Bills & Utilities',
                     data: billsData,
-                    backgroundColor: '#1E293B',
-                    hoverBackgroundColor: '#334155',
+                    backgroundColor: '#818CF8',
+                    hoverBackgroundColor: '#A5B4FC',
                     stack: 'expenseStack',
                     barPercentage: 0.55,
                     categoryPercentage: 0.45,
@@ -266,7 +268,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         title: function(tooltipItems) {
                             if (!tooltipItems.length) return '';
                             const idx = tooltipItems[0].dataIndex;
-                            return rollingFullMonths[idx] || tooltipItems[0].label;
+                            return trendChart.activeFullMonths ? trendChart.activeFullMonths[idx] : (rollingFullMonths[idx] || tooltipItems[0].label);
                         },
                         label: function(context) {
                             let categoryName = context.dataset.label || '';
@@ -282,12 +284,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     grid: { display: false },
                     ticks: {
                         color: function(context) {
-                            return (context.index === currentMonthIdx) ? '#F8FAFC' : '#94A3B8';
+                            return (context.index === currentMonthIdx || trendChart.data.labels.length === 1) ? '#F8FAFC' : '#94A3B8';
                         },
                         font: function(context) {
                             return {
                                 size: 13,
-                                weight: (context.index === currentMonthIdx) ? '700' : '500'
+                                weight: (context.index === currentMonthIdx || trendChart.data.labels.length === 1) ? '700' : '500'
                             };
                         }
                     }
@@ -309,6 +311,59 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
     });
+
+    trendChart.activeFullMonths = rollingFullMonths;
+
+    // Interactive Pill Click Handlers
+    const pillLast = document.getElementById('pillLastMonth');
+    const pillThis = document.getElementById('pillThisMonth');
+    const pill6Mo = document.getElementById('pill6Mo');
+
+    const activePillStyle = "padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 600; background: var(--surface-hover); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: all 0.2s;";
+    const inactivePillStyle = "padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;";
+
+    function setPillActive(activeElement) {
+        [pillLast, pillThis, pill6Mo].forEach(el => {
+            if (el) el.style.cssText = inactivePillStyle;
+        });
+        if (activeElement) activeElement.style.cssText = activePillStyle;
+    }
+
+    if (pill6Mo) {
+        pill6Mo.addEventListener('click', function() {
+            setPillActive(pill6Mo);
+            trendChart.data.labels = rollingLabels;
+            trendChart.data.datasets[0].data = incomeData;
+            trendChart.data.datasets[1].data = spendingData;
+            trendChart.data.datasets[2].data = billsData;
+            trendChart.activeFullMonths = rollingFullMonths;
+            trendChart.update();
+        });
+    }
+
+    if (pillThis) {
+        pillThis.addEventListener('click', function() {
+            setPillActive(pillThis);
+            trendChart.data.labels = [rollingLabels[currentMonthIdx]];
+            trendChart.data.datasets[0].data = [incomeData[currentMonthIdx]];
+            trendChart.data.datasets[1].data = [spendingData[currentMonthIdx]];
+            trendChart.data.datasets[2].data = [billsData[currentMonthIdx]];
+            trendChart.activeFullMonths = [rollingFullMonths[currentMonthIdx]];
+            trendChart.update();
+        });
+    }
+
+    if (pillLast) {
+        pillLast.addEventListener('click', function() {
+            setPillActive(pillLast);
+            trendChart.data.labels = [rollingLabels[lastMonthIdx]];
+            trendChart.data.datasets[0].data = [incomeData[lastMonthIdx]];
+            trendChart.data.datasets[1].data = [spendingData[lastMonthIdx]];
+            trendChart.data.datasets[2].data = [billsData[lastMonthIdx]];
+            trendChart.activeFullMonths = [rollingFullMonths[lastMonthIdx]];
+            trendChart.update();
+        });
+    }
 });
 </script>
 {% endblock %}
