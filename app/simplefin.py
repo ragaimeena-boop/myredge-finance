@@ -44,13 +44,17 @@ from difflib import SequenceMatcher
 def clean_merchant_description(desc: str, payee: str = "") -> str:
     """
     Normalize raw bank text into a clean merchant string.
-    Strips payment processor prefixes (TST*, SQ *, PAYPAL *), store numbers (#1234),
-    locations (MIAMI FL), phone numbers, zip codes, and transaction codes.
+    Strips payment processor prefixes (FAWRY*, PAYMOB*, TST*, SQ *, PAYPAL *), store numbers (#1234),
+    locations (MIAMI FL), trailing symbols, phone numbers, zip codes, and transaction codes.
     """
     raw = payee if (payee and len(payee.strip()) >= 3) else (desc or "")
     s = raw.upper()
 
-    prefixes = [r"^TST\*\s*", r"^SQ\s*\*\s*", r"^PAYPAL\s*\*\s*", r"^POS\s+PURCH\s*", r"^DBT\s+CRD\s*", r"^APLY\s+PAY\s*", r"^CHECKCARD\s*"]
+    prefixes = [
+        r"^FAWRY\s*\*\s*", r"^FAWRYPF\s*\*\s*", r"^PAYMOB\s*-\s*\*\s*", r"^PAYMOB\s*\*\s*",
+        r"^TST\*\s*", r"^SQ\s*\*\s*", r"^PAYPAL\s*\*\s*", r"^POS\s+PURCH\s*",
+        r"^DBT\s+CRD\s*", r"^APLY\s+PAY\s*", r"^CHECKCARD\s*", r"^COLLEGEBOARD\*\s*"
+    ]
     for p in prefixes:
         s = re.sub(p, "", s)
 
@@ -59,6 +63,7 @@ def clean_merchant_description(desc: str, payee: str = "") -> str:
     s = re.sub(r"\b\d{5}(-\d{4})?\b", "", s)
     s = re.sub(r"\b[A-Z]+\s+(FL|CA|NY|TX|GA|NC|SC|TN|OH|PA|IL|MA|NJ|VA|WA)\b$", "", s)
     s = re.sub(r"\b(FL|CA|NY|TX|GA|NC|SC|TN|OH|PA|IL|MA|NJ|VA|WA)\b", "", s)
+    s = re.sub(r"[>|\*]+$", "", s)
     s = re.sub(r"\s+", " ", s).strip()
 
     return s
@@ -77,27 +82,36 @@ def infer_account_type(name: str, org_name: str = "") -> str:
     return "checking"
 
 HEURISTIC_KEYWORDS = [
-    # Taxes
-    (["IRS", "US TREAS", "TREASURY", "INTERNAL REVENUE", "TAX PAY", "PROPERTY TAX", "TAX COLLECTOR", "STATE TAX", "TURBOTAX", "H&R BLOCK", "TAXACT"], "IRS/Taxes", 0),
+    # Taxes & Revenue
+    (["FLA DEPT REVENUE", "DEPT REVENUE", "DEPT OF REVENUE", "DEPT REV", "FL DEPT", "FLA DEPT", "REVENUE", "IRS", "US TREAS", "TREASURY", "INTERNAL REVENUE", "TAX PAY", "PROPERTY TAX", "TAX COLLECTOR", "STATE TAX", "TURBOTAX", "H&R BLOCK", "TAXACT"], "IRS/Taxes", 0),
+    
+    # Education & Learning
+    (["COLLEGEBOARD", "COLLEGE BOARD", "SAT ONLN", "ACT TEST", "UNIVERSITY", "COLLEGE", "TUITION", "COURSERA", "UDEMY", "EDX", "SCHOOL", "ACADEMY", "LEARNING", "EDUCATION"], "Education & Learning", 0),
     
     # Office
-    (["STAPLES", "OFFICE DEPOT", "OFFICEMAX", "FEDEX OFFICE", "UPS STORE", "PAPER", "INK", "DESK", "WORKPLACE"], "Office", 0),
+    (["STAPLES", "OFFICE DEPOT", "OFFICEMAX", "FEDEX OFFICE", "UPS STORE", "PAPER", "INK", "DESK", "WORKPLACE", "OFFICE"], "Office", 0),
     
     # Entertainment
-    (["CINEMA", "THEATER", "THEATRE", "MOVIE", "STREAM", "PLAYSTATION", "XBOX", "NINTENDO", "GAME", "STEAM", "TICKETMASTER", "EVENTBRITE", "STUBHUB", "GOLF", "BOWLING", "MUSEUM", "DISNEY", "UNIVERSAL"], "Entertainment", 0),
+    (["NEVERLAND", "PAYMOB-*NEVERLAND", "PARK", "RESORT", "CINEMA", "THEATER", "THEATRE", "MOVIE", "STREAM", "PLAYSTATION", "XBOX", "NINTENDO", "GAME", "STEAM", "TICKETMASTER", "EVENTBRITE", "STUBHUB", "GOLF", "BOWLING", "MUSEUM", "DISNEY", "UNIVERSAL", "ENTERTAINMENT"], "Entertainment", 0),
+
+    # Auto & Transportation
+    (["TYREPRO", "TYRE", "TIRE", "AUTO REPAIR", "AUTOMOTIVE", "MECHANIC", "GAS", "OIL", "FUEL", "CHEVRON", "SHELL", "EXXON", "MOBIL", "BP", "WAWA", "SPEEDWAY", "VALERO"], "Auto Payment & Insurance", 0),
     
+    # Rent & Housing
+    (["RES MANAGEMENT", "RAGHAEB RES", "RESIDENTIAL MANAGEMENT", "PROPERTY MANAGEMENT", "REALTY", "RENT", "MORTGAGE", "APARTMENTS", "LEASE"], "Mortgage & Rent", 0),
+
+    # Groceries & Specialty
+    (["STAR K", "KOSHER", "MARKET", "GROCERY", "SUPERMARKET", "WHOLE FOODS", "TRADER JOE", "PUBLIX", "COSTCO", "ALDI", "KROGER"], "Groceries", 0),
+
     # Medical & Healthcare
     (["CVS", "WALGREENS", "RITE AID", "PHARMACY", "CLINIC", "HOSPITAL", "DOCTOR", "DENTAL", "DENTIST", "QUEST DIAGNOSTICS", "LABCORP", "OPTICAL", "VISION", "HEALTHCARE"], "Medical & Healthcare", 0),
     
     # Restaurants & Dining
     (["CAFE", "BISTRO", "GRILL", "DINER", "BURGER", "PIZZA", "SUSHI", "TACO", "BAKERY", "BAR", "PUB", "RESTAURANT", "KITCHEN"], "Restaurants & Dining", 0),
     
-    # Groceries
-    (["MARKET", "GROCERY", "SUPERMARKET", "WHOLE FOODS", "TRADER JOE", "PUBLIX", "COSTCO", "ALDI", "KROGER"], "Groceries", 0),
-    
-    # Fuel
-    (["GAS", "OIL", "FUEL", "CHEVRON", "SHELL", "EXXON", "MOBIL", "BP", "WAWA", "SPEEDWAY", "VALERO"], "Fuel & Gas", 0),
-    
+    # Shopping & Retail
+    (["FAWRY", "LEATHER", "CLOTHING", "BOUTIQUE", "RETAIL", "AMAZON", "TARGET", "WALMART", "BEST BUY", "HOME DEPOT", "LOWES"], "Shopping & Retail", 0),
+
     # Transfers
     (["ATM WITHDRAWAL", "CASH WITHDRAWAL", "WIRE TRANSFER", "ACH TRANSFER", "ZELLE", "VENMO", "PAYPAL"], "Internal Transfer", 1),
 ]

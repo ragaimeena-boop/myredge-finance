@@ -264,6 +264,7 @@ def init_db():
         ("Legal & Professional", "Services", "file-text", "#A855F7", 0, 0),
         ("Office", "Services", "briefcase", "#8B5CF6", 0, 0),
         ("IRS/Taxes", "Services", "file-text", "#EF4444", 0, 0),
+        ("Education & Learning", "Services", "book-open", "#3B82F6", 0, 0),
 
         # Transfers & Financial
         ("Credit Card Payment", "Transfers", "credit-card", "#64748B", 0, 1),
@@ -280,6 +281,19 @@ def init_db():
 
     # Seed Default Categorization Rules (INSERT OR IGNORE ensures missing rules are safely added to existing DBs)
     default_rules = [
+        # Education & Learning
+        ("COLLEGEBOARD", "Education & Learning", "College Board", 0),
+        ("COLLEGE BOARD", "Education & Learning", "College Board", 0),
+        ("SAT ONLN", "Education & Learning", "College Board SAT", 0),
+        ("ACT TEST", "Education & Learning", "ACT", 0),
+        ("UNIVERSITY", "Education & Learning", None, 0),
+        ("COLLEGE", "Education & Learning", None, 0),
+        ("TUITION", "Education & Learning", None, 0),
+        ("COURSERA", "Education & Learning", "Coursera", 0),
+        ("UDEMY", "Education & Learning", "Udemy", 0),
+        ("EDX", "Education & Learning", "edX", 0),
+        ("SCHOOL", "Education & Learning", None, 0),
+
         # Office
         ("STAPLES", "Office", "Staples", 0),
         ("OFFICE DEPOT", "Office", "Office Depot", 0),
@@ -289,6 +303,12 @@ def init_db():
         ("OFFICE", "Office", None, 0),
 
         # IRS / Taxes
+        ("FLA DEPT REVENUE", "IRS/Taxes", "Florida Dept of Revenue", 0),
+        ("DEPT REVENUE", "IRS/Taxes", "Department of Revenue", 0),
+        ("DEPT OF REVENUE", "IRS/Taxes", "Department of Revenue", 0),
+        ("FL DEPT", "IRS/Taxes", "Dept of Revenue", 0),
+        ("FLA DEPT", "IRS/Taxes", "Dept of Revenue", 0),
+        ("REVENUE", "IRS/Taxes", "Dept of Revenue", 0),
         ("IRS", "IRS/Taxes", "Internal Revenue Service", 0),
         ("US TREASURY", "IRS/Taxes", "US Treasury", 0),
         ("US TREAS", "IRS/Taxes", "US Treasury", 0),
@@ -299,7 +319,26 @@ def init_db():
         ("TAX COLLECTOR", "IRS/Taxes", "Tax Collector", 0),
         ("PROPERTY TAX", "IRS/Taxes", "Property Tax", 0),
 
+        # Auto & Transportation
+        ("TYREPRO", "Auto Payment & Insurance", "Tyrepro", 0),
+        ("TYRE", "Auto Payment & Insurance", None, 0),
+        ("TIRE", "Auto Payment & Insurance", None, 0),
+        ("AUTO REPAIR", "Auto Payment & Insurance", None, 0),
+
+        # Housing & Rent Management
+        ("RES MANAGEMENT", "Mortgage & Rent", "Residential Management", 0),
+        ("RAGHAEB RES", "Mortgage & Rent", "Raghaeb Res Management", 0),
+        ("RESIDENTIAL", "Mortgage & Rent", None, 0),
+        ("REALTY", "Mortgage & Rent", None, 0),
+        ("APARTMENTS", "Mortgage & Rent", None, 0),
+
+        # Groceries & Specialty
+        ("STAR K", "Groceries", "Star K Groceries", 0),
+        ("KOSHER", "Groceries", None, 0),
+
         # Entertainment
+        ("PAYMOB-*NEVERLAND", "Entertainment", "Neverland Resort", 0),
+        ("NEVERLAND", "Entertainment", "Neverland", 0),
         ("AMC", "Entertainment", "AMC Theatres", 0),
         ("REGAL", "Entertainment", "Regal Cinemas", 0),
         ("CINEMARK", "Entertainment", "Cinemark", 0),
@@ -312,14 +351,11 @@ def init_db():
         ("TICKETMASTER", "Entertainment", "Ticketmaster", 0),
         ("EVENTBRITE", "Entertainment", "Eventbrite", 0),
         ("STUBHUB", "Entertainment", "StubHub", 0),
-        ("CONCERT", "Entertainment", None, 0),
-        ("ENTERTAINMENT", "Entertainment", None, 0),
-        ("GOLF", "Entertainment", None, 0),
-        ("BOWLING", "Entertainment", None, 0),
-        ("MUSEUM", "Entertainment", None, 0),
-        ("DISNEYLAND", "Entertainment", "Disneyland", 0),
-        ("DISNEY WORLD", "Entertainment", "Walt Disney World", 0),
-        ("UNIVERSAL STUDIOS", "Entertainment", "Universal Studios", 0),
+
+        # Shopping & Retail
+        ("FAWRYPF*LEATHER", "Shopping & Retail", "Fawrypf Leather", 0),
+        ("FAWRY", "Shopping & Retail", None, 0),
+        ("LEATHER", "Shopping & Retail", None, 0),
 
         # Transfers & Credit Cards
         ("CREDIT CARD", "Credit Card Payment", None, 1),

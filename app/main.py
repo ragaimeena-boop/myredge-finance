@@ -343,12 +343,14 @@ def update_transaction_category(tx_id: str, request: Request, category_id: str =
 
             # Learn rule from user action & bulk categorize matching uncategorized transactions
             if tx_row:
-                raw_pattern = (tx_row["payee"] or tx_row["description"] or "").strip().upper()
+                from app.simplefin import clean_merchant_description
+                clean_p = clean_merchant_description(tx_row["description"], tx_row["payee"])
+                raw_pattern = clean_p if (clean_p and len(clean_p) >= 3) else (tx_row["payee"] or tx_row["description"] or "").strip().upper()
                 if len(raw_pattern) >= 3:
                     cursor.execute("""
                     INSERT OR IGNORE INTO rules (pattern, category_id, clean_payee, is_transfer, priority)
                     VALUES (?, ?, ?, 0, 20);
-                    """, (raw_pattern, cat_id, tx_row["payee"]))
+                    """, (raw_pattern, cat_id, tx_row["payee"] or raw_pattern.title()))
                     
                     cursor.execute("""
                     UPDATE transactions
