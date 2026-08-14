@@ -71,9 +71,16 @@ def init_db():
         available_balance_cents INTEGER,
         org_name TEXT,
         org_domain TEXT,
+        account_type TEXT DEFAULT 'checking',
         updated_at TEXT NOT NULL
     );
     """)
+
+    # Schema Migration: Ensure account_type column exists
+    cursor.execute("PRAGMA table_info(accounts);")
+    cols = [r[1] for r in cursor.fetchall()]
+    if "account_type" not in cols:
+        cursor.execute("ALTER TABLE accounts ADD COLUMN account_type TEXT DEFAULT 'checking';")
 
     # Categories table
     cursor.execute("""
@@ -152,44 +159,46 @@ def init_db():
     );
     """)
 
-    # Seed Default Categories if empty
-    cursor.execute("SELECT COUNT(*) FROM categories;")
-    if cursor.fetchone()[0] == 0:
-        default_categories = [
-            # Income
-            ("Salary & Wages", "Income", "briefcase", "#10B981", 1, 0),
-            ("Investments & Interest", "Income", "trending-up", "#059669", 1, 0),
-            ("Other Income", "Income", "dollar-sign", "#34D399", 1, 0),
-            
-            # Housing
-            ("Mortgage & Rent", "Housing", "home", "#6366F1", 0, 0),
-            ("Utilities", "Housing", "zap", "#818CF8", 0, 0),
-            ("Home Maintenance", "Housing", "tool", "#A5B4FC", 0, 0),
+    # Seed Default Categories (INSERT OR IGNORE to add new categories safely)
+    default_categories = [
+        # Income
+        ("Salary & Wages", "Income", "briefcase", "#10B981", 1, 0),
+        ("Demetrius Income", "Income", "user-check", "#059669", 1, 0),
+        ("Investments & Interest", "Income", "trending-up", "#34D399", 1, 0),
+        ("Other Income", "Income", "dollar-sign", "#6EE7B7", 1, 0),
+        
+        # Housing & Utilities
+        ("Mortgage & Rent", "Housing", "home", "#6366F1", 0, 0),
+        ("Utilities", "Housing", "zap", "#818CF8", 0, 0),
+        ("Data/Tele", "Housing", "smartphone", "#A5B4FC", 0, 0),
+        ("Home Maintenance", "Housing", "tool", "#C7D2FE", 0, 0),
 
-            # Food & Dining
-            ("Groceries", "Food & Dining", "shopping-bag", "#F59E0B", 0, 0),
-            ("Restaurants & Dining", "Food & Dining", "coffee", "#FBBF24", 0, 0),
+        # Food & Dining
+        ("Groceries", "Food & Dining", "shopping-bag", "#F59E0B", 0, 0),
+        ("Restaurants & Dining", "Food & Dining", "coffee", "#FBBF24", 0, 0),
 
-            # Transportation
-            ("Fuel & Gas", "Transportation", "truck", "#EF4444", 0, 0),
-            ("Auto Payment & Insurance", "Transportation", "shield", "#F87171", 0, 0),
-            ("Transit & Rideshare", "Transportation", "navigation", "#FCA5A5", 0, 0),
+        # Transportation
+        ("Fuel & Gas", "Transportation", "truck", "#EF4444", 0, 0),
+        ("Auto Payment & Insurance", "Transportation", "shield", "#F87171", 0, 0),
+        ("Transit & Rideshare", "Transportation", "navigation", "#FCA5A5", 0, 0),
 
-            # Lifestyle & Bills
-            ("Shopping & Retail", "Lifestyle", "shopping-cart", "#EC4899", 0, 0),
-            ("Subscriptions & Recurring", "Lifestyle", "repeat", "#F472B6", 0, 0),
-            ("Medical & Healthcare", "Healthcare", "heart", "#06B6D4", 0, 0),
+        # Lifestyle & Travel
+        ("Shopping & Retail", "Lifestyle", "shopping-cart", "#EC4899", 0, 0),
+        ("Travel", "Lifestyle", "plane", "#38BDF8", 0, 0),
+        ("Subscriptions & Recurring", "Lifestyle", "repeat", "#F472B6", 0, 0),
+        ("Medical & Healthcare", "Healthcare", "heart", "#06B6D4", 0, 0),
 
-            # Transfers & Financial
-            ("Credit Card Payment", "Transfers", "credit-card", "#64748B", 0, 1),
-            ("Internal Transfer", "Transfers", "repeat", "#94A3B8", 0, 1),
-            ("Uncategorized", "Other", "help-circle", "#64748B", 0, 0),
-        ]
+        # Transfers & Financial
+        ("Credit Card Payment", "Transfers", "credit-card", "#64748B", 0, 1),
+        ("Internal Transfer", "Transfers", "repeat", "#94A3B8", 0, 1),
+        ("Uncategorized", "Other", "help-circle", "#64748B", 0, 0),
+    ]
 
-        cursor.executemany("""
-        INSERT INTO categories (name, group_name, icon, color, is_income, is_transfer)
+    for cname, gname, icon, color, is_inc, is_trans in default_categories:
+        cursor.execute("""
+        INSERT OR IGNORE INTO categories (name, group_name, icon, color, is_income, is_transfer)
         VALUES (?, ?, ?, ?, ?, ?);
-        """, default_categories)
+        """, (cname, gname, icon, color, is_inc, is_trans))
 
     # Seed Default Categorization Rules (INSERT OR IGNORE ensures missing rules are safely added to existing DBs)
     default_rules = [
@@ -203,6 +212,46 @@ def init_db():
         ("ZELLE", "Internal Transfer", None, 1),
         ("VENMO", "Internal Transfer", None, 1),
         ("PAYPAL", "Internal Transfer", None, 1),
+
+        # Income
+        ("DEMETRIUS", "Demetrius Income", None, 0),
+        ("PAYROLL DIRECT DEPOSIT", "Salary & Wages", None, 0),
+        ("DIRECT DEPOSIT", "Salary & Wages", None, 0),
+        ("PAYROLL", "Salary & Wages", None, 0),
+        ("DIVIDEND", "Investments & Interest", None, 0),
+        ("SCHWAB", "Investments & Interest", "Charles Schwab", 0),
+        ("BETTERMENT", "Investments & Interest", "Betterment", 0),
+        ("BUILDWEALTH", "Investments & Interest", "Buildwealth", 0),
+        ("FIDELITY", "Investments & Interest", "Fidelity Investments", 0),
+        ("VANGUARD", "Investments & Interest", "Vanguard", 0),
+
+        # Data / Tele
+        ("AT&T", "Data/Tele", "AT&T", 0),
+        ("ATT ", "Data/Tele", "AT&T", 0),
+        ("VERIZON", "Data/Tele", "Verizon", 0),
+        ("T-MOBILE", "Data/Tele", "T-Mobile", 0),
+        ("TMOBILE", "Data/Tele", "T-Mobile", 0),
+        ("COMCAST", "Data/Tele", "Comcast Xfinity", 0),
+        ("XFINITY", "Data/Tele", "Comcast Xfinity", 0),
+        ("SPECTRUM", "Data/Tele", "Spectrum", 0),
+        ("CHARTER", "Data/Tele", "Spectrum", 0),
+        ("CENTURYLINK", "Data/Tele", "CenturyLink", 0),
+        ("FRONTIER", "Data/Tele", "Frontier", 0),
+        ("GOOGLE FIBER", "Data/Tele", "Google Fiber", 0),
+
+        # Travel
+        ("DELTA", "Travel", "Delta Air Lines", 0),
+        ("UNITED AIR", "Travel", "United Airlines", 0),
+        ("SOUTHWEST", "Travel", "Southwest Airlines", 0),
+        ("AMERICAN AIR", "Travel", "American Airlines", 0),
+        ("AIRBNB", "Travel", "Airbnb", 0),
+        ("HOTEL", "Travel", None, 0),
+        ("MARRIOTT", "Travel", "Marriott", 0),
+        ("HILTON", "Travel", "Hilton", 0),
+        ("HYATT", "Travel", "Hyatt", 0),
+        ("EXPEDIA", "Travel", "Expedia", 0),
+        ("BOOKING.COM", "Travel", "Booking.com", 0),
+        ("VRBO", "Travel", "VRBO", 0),
 
         # Food & Dining
         ("PUBLIX", "Groceries", "Publix", 0),
@@ -264,28 +313,6 @@ def init_db():
         ("FLORIDA POWER", "Utilities", "Florida Power & Light", 0),
         ("FPL", "Utilities", "Florida Power & Light", 0),
         ("DUKE ENERGY", "Utilities", "Duke Energy", 0),
-        ("AT&T", "Utilities", "AT&T", 0),
-        ("ATT ", "Utilities", "AT&T", 0),
-        ("VERIZON", "Utilities", "Verizon", 0),
-        ("T-MOBILE", "Utilities", "T-Mobile", 0),
-        ("COMCAST", "Utilities", "Comcast Xfinity", 0),
-        ("XFINITY", "Utilities", "Comcast Xfinity", 0),
-        ("SPECTRUM", "Utilities", "Spectrum", 0),
-
-        # Healthcare
-        ("QUEST DIAG", "Medical & Healthcare", "Quest Diagnostics", 0),
-        ("LABCORP", "Medical & Healthcare", "Labcorp", 0),
-        ("CVS", "Medical & Healthcare", "CVS Pharmacy", 0),
-        ("WALGREENS", "Medical & Healthcare", "Walgreens", 0),
-
-        # Income
-        ("PAYROLL DIRECT DEPOSIT", "Salary & Wages", None, 0),
-        ("DIRECT DEPOSIT", "Salary & Wages", None, 0),
-        ("PAYROLL", "Salary & Wages", None, 0),
-        ("DIVIDEND", "Investments & Interest", None, 0),
-        ("SCHWAB", "Investments & Interest", "Charles Schwab", 0),
-        ("FIDELITY", "Investments & Interest", "Fidelity Investments", 0),
-        ("VANGUARD", "Investments & Interest", "Vanguard", 0),
     ]
     
     for pattern, cat_name, clean_payee, is_trans in default_rules:

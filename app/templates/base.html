@@ -65,6 +65,11 @@
                 </a>
             </li>
             <li>
+                <a href="/accounts" class="nav-link {% if active_page == 'accounts' %}active{% endif %}">
+                    <span class="nav-icon">🏦</span> <span class="nav-text">Accounts</span>
+                </a>
+            </li>
+            <li>
                 <a href="/transactions" class="nav-link {% if active_page == 'transactions' %}active{% endif %}">
                     <span class="nav-icon">💳</span> <span class="nav-text">Transactions</span>
                 </a>
@@ -116,21 +121,26 @@
                         <span class="nav-icon">📈</span> <span class="nav-text">Yearly Report</span>
                     </a>
                 </li>
-                <li>
-                    <a href="/transactions" class="nav-link {% if active_page == 'transactions' %}active{% endif %}" title="Transactions">
-                        <span class="nav-icon">💳</span> <span class="nav-text">Transactions</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="/investments" class="nav-link {% if active_page == 'investments' %}active{% endif %}" title="Investments">
-                        <span class="nav-icon">📈</span> <span class="nav-text">Investments</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="/subscriptions" class="nav-link {% if active_page == 'subscriptions' %}active{% endif %}" title="Subscriptions">
-                        <span class="nav-icon">🔁</span> <span class="nav-text">Subscriptions</span>
-                    </a>
-                </li>
+            <li>
+                <a href="/accounts" class="nav-link {% if active_page == 'accounts' %}active{% endif %}" title="Accounts">
+                    <span class="nav-icon">🏦</span> <span class="nav-text">Accounts</span>
+                </a>
+            </li>
+            <li>
+                <a href="/transactions" class="nav-link {% if active_page == 'transactions' %}active{% endif %}" title="Transactions">
+                    <span class="nav-icon">💳</span> <span class="nav-text">Transactions</span>
+                </a>
+            </li>
+            <li>
+                <a href="/investments" class="nav-link {% if active_page == 'investments' %}active{% endif %}" title="Investments">
+                    <span class="nav-icon">📈</span> <span class="nav-text">Investments</span>
+                </a>
+            </li>
+            <li>
+                <a href="/subscriptions" class="nav-link {% if active_page == 'subscriptions' %}active{% endif %}" title="Subscriptions">
+                    <span class="nav-icon">🔁</span> <span class="nav-text">Subscriptions</span>
+                </a>
+            </li>
             </ul>
         </aside>
 

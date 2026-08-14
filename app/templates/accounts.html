@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Accounts & Institutions - MYREDGE Finance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Accounts & Institutions</h1>
+        <div class="page-subtitle">Manage connected accounts and categorize account types for accurate portfolio analytics</div>
+    </div>
+</div>
+
+{% if type_updated %}
+<div class="alert alert-success" style="background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.4); color: #2ecc71; padding: 14px 18px; border-radius: 10px; margin-bottom: 24px; font-weight: 500;">
+    ✓ Account classification type updated successfully!
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Account Name</th>
+                    <th>Institution</th>
+                    <th>Account Type</th>
+                    <th style="text-align: right;">Current Balance</th>
+                    <th style="text-align: right;">Available Balance</th>
+                    <th style="text-align: right;">Last Synced</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for acc in accounts %}
+                <tr>
+                    <td style="font-weight: 600;">
+                        {{ acc.name }}
+                    </td>
+                    <td>
+                        <span style="display: inline-flex; align-items: center; gap: 6px;">
+                            🏢 {{ acc.org_name or 'Direct Connection' }}
+                        </span>
+                    </td>
+                    <td>
+                        <form action="/api/accounts/{{ acc.id }}/type" method="post" style="margin: 0;">
+                            <select name="account_type" onchange="this.form.submit()" class="btn" style="padding: 4px 8px; font-size: 0.85rem; background-color: var(--surface-color); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;">
+                                {% for type_val, type_name in account_types %}
+                                <option value="{{ type_val }}" {% if acc.account_type == type_val %}selected{% endif %}>
+                                    {{ type_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </td>
+                    <td style="text-align: right; font-weight: 700;" class="num {% if acc.balance_cents < 0 %}expense{% else %}income{% endif %}">
+                        {{ acc.formatted_balance }}
+                    </td>
+                    <td style="text-align: right;" class="num">
+                        {{ acc.formatted_available }}
+                    </td>
+                    <td style="text-align: right; font-size: 0.82rem; color: var(--text-secondary);">
+                        {{ acc.updated_at[:10] if acc.updated_at else 'N/A' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-secondary);">
+                        No connected accounts found. Click <strong>⚡ Sync Now</strong> on the dashboard home page to pull accounts from SimpleFIN.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -387,3 +387,58 @@ def trigger_purge_demo():
         conn.close()
     return RedirectResponse(url="/?demo_purged=1", status_code=303)
 
+@app.get("/accounts", response_class=HTMLResponse)
+def read_accounts(request: Request):
+    """Accounts management view listing connected accounts with editable account_type."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM accounts ORDER BY account_type, name;")
+        accounts = []
+        account_types = [
+            ("checking", "Checking"),
+            ("savings", "Savings"),
+            ("credit_card", "Credit Card"),
+            ("investment", "Investment"),
+            ("retirement", "Retirement 401(k)/IRA"),
+            ("loan", "Loan / Mortgage"),
+            ("other", "Other")
+        ]
+        
+        for row in cursor.fetchall():
+            acc_dict = dict(row)
+            acc_dict["formatted_balance"] = format_currency(acc_dict["balance_cents"])
+            acc_dict["formatted_available"] = format_currency(acc_dict["available_balance_cents"]) if acc_dict["available_balance_cents"] is not None else "N/A"
+            acc_dict["type_label"] = (acc_dict.get("account_type") or "checking").replace("_", " ").title()
+            accounts.append(acc_dict)
+
+        type_updated = request.query_params.get("updated")
+
+        return templates.TemplateResponse(request=request, name="accounts.html", context={
+            "active_page": "accounts",
+            "accounts": accounts,
+            "account_types": account_types,
+            "type_updated": type_updated
+        })
+    finally:
+        conn.close()
+
+@app.post("/api/accounts/{account_id}/type")
+def update_account_type(account_id: str, request: Request, account_type: str = Form(default="checking")):
+    """Update account_type classification for an account."""
+    conn = get_connection()
+    now_str = current_eastern_time().isoformat()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE accounts 
+        SET account_type = ?, updated_at = ?
+        WHERE id = ?;
+        """, (account_type, now_str, account_id))
+        conn.commit()
+
+        return RedirectResponse(url="/accounts?updated=1", status_code=303)
+    finally:
+        conn.close()
+
+

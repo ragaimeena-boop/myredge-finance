@@ -38,29 +38,84 @@ class SimpleFINClient:
         payload = response.json()
         return SimpleFINResponse.model_validate(payload)
 
+import re
+from difflib import SequenceMatcher
+
+def clean_merchant_description(desc: str, payee: str = "") -> str:
+    """
+    Normalize raw bank text into a clean merchant string.
+    Strips payment processor prefixes (TST*, SQ *, PAYPAL *), store numbers (#1234),
+    locations (MIAMI FL), phone numbers, zip codes, and transaction codes.
+    """
+    raw = payee if (payee and len(payee.strip()) >= 3) else (desc or "")
+    s = raw.upper()
+
+    prefixes = [r"^TST\*\s*", r"^SQ\s*\*\s*", r"^PAYPAL\s*\*\s*", r"^POS\s+PURCH\s*", r"^DBT\s+CRD\s*", r"^APLY\s+PAY\s*", r"^CHECKCARD\s*"]
+    for p in prefixes:
+        s = re.sub(p, "", s)
+
+    s = re.sub(r"#\d+", "", s)
+    s = re.sub(r"\bSTORE\s*\d+\b", "", s)
+    s = re.sub(r"\b\d{5}(-\d{4})?\b", "", s)
+    s = re.sub(r"\b[A-Z]+\s+(FL|CA|NY|TX|GA|NC|SC|TN|OH|PA|IL|MA|NJ|VA|WA)\b$", "", s)
+    s = re.sub(r"\b(FL|CA|NY|TX|GA|NC|SC|TN|OH|PA|IL|MA|NJ|VA|WA)\b", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+
+    return s
+
+def infer_account_type(name: str, org_name: str = "") -> str:
+    """Infer account type (checking, savings, credit_card, investment, retirement) from name & org."""
+    combined = f"{name} {org_name}".upper()
+    if any(k in combined for k in ["BETTERMENT", "BUILDWEALTH", "SCHWAB", "FIDELITY", "VANGUARD", "E*TRADE", "MERRILL", "BROKERAGE"]):
+        return "investment"
+    elif any(k in combined for k in ["401K", "401(K)", "IRA", "RETIREMENT", "PENSION", "TRANSAMERICA"]):
+        return "retirement"
+    elif any(k in combined for k in ["CREDIT", "CARD", "VISA", "MASTERCARD", "AMEX", "DISCOVER"]):
+        return "credit_card"
+    elif "SAVINGS" in combined or "MONEY MARKET" in combined:
+        return "savings"
+    return "checking"
+
 def apply_categorization_rules(conn, description: str, payee: str) -> Tuple[int | None, str | None, int]:
     """
-    Match transaction description/payee against database rules.
+    Match transaction description/payee against database rules using multi-tier intelligence.
     Returns (category_id, clean_payee, is_transfer).
     """
     cursor = conn.cursor()
     cursor.execute("SELECT id, pattern, category_id, clean_payee, is_transfer FROM rules ORDER BY priority DESC;")
     rules = cursor.fetchall()
 
-    desc_upper = (description or "").upper()
-    payee_upper = (payee or "").upper()
+    raw_desc = (description or "").upper()
+    raw_payee = (payee or "").upper()
+    clean_merchant = clean_merchant_description(description, payee)
 
+    # Tier 1: Substring / Token Match in clean merchant or raw text
     for rule in rules:
         pattern = rule["pattern"].upper()
-        if pattern in desc_upper or pattern in payee_upper:
-            clean_payee = rule["clean_payee"] if rule["clean_payee"] else payee
-            return rule["category_id"], clean_payee, rule["is_transfer"]
+        if pattern in clean_merchant or pattern in raw_desc or pattern in raw_payee:
+            final_payee = rule["clean_payee"] if rule["clean_payee"] else (payee or clean_merchant.title())
+            return rule["category_id"], final_payee, rule["is_transfer"]
+
+    # Tier 2: Fuzzy similarity match against rule pattern keywords
+    best_match = None
+    highest_score = 0.0
+    for rule in rules:
+        pattern = rule["pattern"].upper()
+        if len(pattern) >= 4 and len(clean_merchant) >= 4:
+            ratio = SequenceMatcher(None, pattern, clean_merchant).ratio()
+            if ratio >= 0.82 and ratio > highest_score:
+                highest_score = ratio
+                best_match = rule
+
+    if best_match:
+        final_payee = best_match["clean_payee"] if best_match["clean_payee"] else (payee or clean_merchant.title())
+        return best_match["category_id"], final_payee, best_match["is_transfer"]
 
     # Fallback to Uncategorized if no rule matches
     cursor.execute("SELECT id FROM categories WHERE name = 'Uncategorized';")
     row = cursor.fetchone()
     cat_id = row["id"] if row else None
-    return cat_id, payee, 0
+    return cat_id, (payee or clean_merchant.title() or "Unknown Merchant"), 0
 
 def reapply_rules_to_uncategorized(conn=None) -> int:
     """
@@ -130,10 +185,12 @@ def ingest_simplefin_data(data: SimpleFINResponse, conn=None) -> Dict[str, int]:
             org_name = account.org.name if account.org else None
             org_domain = account.org.domain if account.org else None
 
+            acc_type = infer_account_type(account.name, org_name or "")
+
             # Upsert Account record
             cursor.execute("""
-            INSERT INTO accounts (id, name, currency, balance_cents, available_balance_cents, org_name, org_domain, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, name, currency, balance_cents, available_balance_cents, org_name, org_domain, account_type, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 currency = excluded.currency,
@@ -141,8 +198,9 @@ def ingest_simplefin_data(data: SimpleFINResponse, conn=None) -> Dict[str, int]:
                 available_balance_cents = excluded.available_balance_cents,
                 org_name = excluded.org_name,
                 org_domain = excluded.org_domain,
+                account_type = COALESCE(accounts.account_type, excluded.account_type),
                 updated_at = excluded.updated_at;
-            """, (account.id, account.name, account.currency, bal_cents, avail_cents, org_name, org_domain, now_str))
+            """, (account.id, account.name, account.currency, bal_cents, avail_cents, org_name, org_domain, acc_type, now_str))
             stats["accounts_synced"] += 1
 
             # Daily Balance Snapshot

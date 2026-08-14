@@ -475,7 +475,10 @@ def get_investments_summary(conn=None) -> Dict[str, Any]:
         # Investment Accounts
         cursor.execute("""
         SELECT * FROM accounts 
-        WHERE name LIKE '%Brokerage%' OR name LIKE '%Retirement%' OR name LIKE '%401%' OR name LIKE '%Schwab%' OR name LIKE '%Transamerica%' OR name LIKE '%Investment%'
+        WHERE account_type IN ('investment', 'retirement')
+           OR name LIKE '%Brokerage%' OR name LIKE '%Retirement%' OR name LIKE '%401%' 
+           OR name LIKE '%Schwab%' OR name LIKE '%Betterment%' OR name LIKE '%Buildwealth%' 
+           OR name LIKE '%Transamerica%' OR name LIKE '%Investment%'
         ORDER BY balance_cents DESC;
         """)
         inv_accounts = []
