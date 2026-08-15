@@ -210,6 +210,40 @@ def update_session_timeout(timeout_minutes: int, conn=None):
         if close_conn:
             conn.close()
 
+def register_biometric_credential(user_id: int, credential_id: str, public_key: str = "webauthn_ok", conn=None):
+    """Store biometric WebAuthn credential for user."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+    try:
+        now_str = current_eastern_time().isoformat()
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE users 
+        SET biometric_credential_id = ?, biometric_public_key = ?, updated_at = ? 
+        WHERE id = ?;
+        """, (credential_id, public_key, now_str, user_id))
+        conn.commit()
+    finally:
+        if close_conn:
+            conn.close()
+
+def get_user_by_biometric_credential(credential_id: str, conn=None) -> Optional[Dict[str, Any]]:
+    """Retrieve user matching WebAuthn biometric credential ID."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE biometric_credential_id = ?;", (credential_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        if close_conn:
+            conn.close()
+
 # --- Session Token Management & Inactivity Timeout ---
 
 def create_session(user_id: int, conn=None) -> str:

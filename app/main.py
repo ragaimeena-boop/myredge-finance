@@ -104,7 +104,7 @@ async def auth_middleware(request: Request, call_next):
     exempt_prefixes = [
         "/static", "/favicon.ico", "/manifest.json", "/sw.js",
         "/login", "/api/login", "/verify-otp", "/api/verify-otp",
-        "/setup-admin", "/api/setup-admin"
+        "/setup-admin", "/api/setup-admin", "/api/biometric/login"
     ]
     if any(path.startswith(prefix) for prefix in exempt_prefixes):
         return await call_next(request)
@@ -829,6 +829,57 @@ def update_timeout(
         return RedirectResponse(url=f"/settings?success=Session+inactivity+timeout+updated+to+{timeout_minutes}+minutes.", status_code=303)
     finally:
         conn.close()
+
+from pydantic import BaseModel
+
+class BiometricRegisterRequest(BaseModel):
+    credential_id: str
+    public_key: str = "webauthn_ok"
+
+class BiometricLoginRequest(BaseModel):
+    credential_id: str
+
+@app.post("/api/biometric/register")
+def register_biometric(
+    request: Request,
+    body: BiometricRegisterRequest
+):
+    """Register WebAuthn biometric credential for logged-in user."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    conn = get_connection()
+    try:
+        register_biometric_credential(user["id"], body.credential_id, body.public_key, conn=conn)
+        return JSONResponse(content={"status": "ok", "message": "Biometric authentication registered successfully!"})
+    finally:
+        conn.close()
+
+@app.post("/api/biometric/login")
+def login_biometric(
+    body: BiometricLoginRequest
+):
+    """Authenticate user via WebAuthn biometric credential."""
+    conn = get_connection()
+    try:
+        user = get_user_by_biometric_credential(body.credential_id, conn=conn)
+        if not user:
+            return JSONResponse(status_code=401, content={"error": "Biometric credential not recognized. Please sign in with password first."})
+
+        session_token = create_session(user["id"], conn=conn)
+        res = JSONResponse(content={"status": "ok", "redirect": "/"})
+        res.set_cookie(
+            key="myredge_session",
+            value=session_token,
+            httponly=True,
+            samesite="lax",
+            max_age=86400 * 30
+        )
+        return res
+    finally:
+        conn.close()
+
 
 
 

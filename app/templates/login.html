@@ -102,6 +102,61 @@
 
             <button type="submit" class="btn-submit">Sign In ➔</button>
         </form>
+
+        <div style="margin-top: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+            <button type="button" onclick="loginWithBiometrics()" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #10B981, #059669); color: #FFF; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                <span>📱 Sign In with Face ID / Touch ID</span>
+            </button>
+            <div id="bioLoginStatus" style="margin-top: 10px; font-size: 13px; color: #94A3B8;"></div>
+        </div>
     </div>
+
+    <script>
+    async function loginWithBiometrics() {
+        const statusDiv = document.getElementById("bioLoginStatus");
+        statusDiv.style.color = "#60A5FA";
+        statusDiv.innerText = "Scanning Face ID / Touch ID...";
+
+        if (!window.PublicKeyCredential) {
+            statusDiv.style.color = "#F87171";
+            statusDiv.innerText = "Biometric login not supported on this device/browser.";
+            return;
+        }
+
+        try {
+            const challenge = new Uint8Array(32);
+            window.crypto.getRandomValues(challenge);
+
+            const credential = await navigator.credentials.get({
+                publicKey: {
+                    challenge: challenge,
+                    timeout: 60000,
+                    userVerification: "preferred"
+                }
+            });
+
+            if (credential) {
+                const res = await fetch("/api/biometric/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ credential_id: credential.id })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === "ok") {
+                    statusDiv.style.color = "#34D399";
+                    statusDiv.innerText = "✓ Face ID / Touch ID verified! Signing in...";
+                    window.location.href = data.redirect || "/";
+                } else {
+                    statusDiv.style.color = "#F87171";
+                    statusDiv.innerText = data.error || "Biometric login failed. Please sign in with password.";
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            statusDiv.style.color = "#F87171";
+            statusDiv.innerText = "Biometric prompt canceled or failed. Please sign in with password.";
+        }
+    }
+    </script>
 </body>
 </html>

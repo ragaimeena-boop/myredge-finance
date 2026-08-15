@@ -68,15 +68,15 @@
 {% endif %}
 
 <div class="card">
-    <div class="table-container">
-        <table>
-            <thead>
+    <div class="table-container" style="max-height: 78vh; overflow-y: auto;">
+        <table id="transactionsTable">
+            <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--surface-color); box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
                 <tr>
-                    <th>Date</th>
-                    <th>Merchant / Payee</th>
-                    <th class="hide-mobile">Account</th>
-                    <th>Category</th>
-                    <th style="text-align: right;">Amount</th>
+                    <th onclick="sortTransactionsTable(0, 'date')" style="cursor: pointer; user-select: none; white-space: nowrap;">Date <span id="sortIcon0" style="font-size: 11px; opacity: 0.7;">↕</span></th>
+                    <th onclick="sortTransactionsTable(1, 'text')" style="cursor: pointer; user-select: none; white-space: nowrap;">Merchant / Payee <span id="sortIcon1" style="font-size: 11px; opacity: 0.7;">↕</span></th>
+                    <th class="hide-mobile" onclick="sortTransactionsTable(2, 'text')" style="cursor: pointer; user-select: none; white-space: nowrap;">Account <span id="sortIcon2" style="font-size: 11px; opacity: 0.7;">↕</span></th>
+                    <th onclick="sortTransactionsTable(3, 'select')" style="cursor: pointer; user-select: none; white-space: nowrap;">Category <span id="sortIcon3" style="font-size: 11px; opacity: 0.7;">↕</span></th>
+                    <th style="text-align: right; cursor: pointer; user-select: none; white-space: nowrap;" onclick="sortTransactionsTable(4, 'amount')">Amount <span id="sortIcon4" style="font-size: 11px; opacity: 0.7;">↕</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -119,4 +119,55 @@
         </table>
     </div>
 </div>
+
+<script>
+let sortDirections = [1, 1, 1, 1, 1];
+
+function sortTransactionsTable(colIndex, type) {
+    const table = document.getElementById("transactionsTable");
+    const tbody = table.querySelector("tbody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    
+    if (rows.length === 1 && rows[0].cells.length === 1) return;
+
+    const dir = sortDirections[colIndex];
+    sortDirections[colIndex] = -dir;
+
+    for (let i = 0; i <= 4; i++) {
+        const icon = document.getElementById("sortIcon" + i);
+        if (icon) icon.innerText = "↕";
+    }
+    const currentIcon = document.getElementById("sortIcon" + colIndex);
+    if (currentIcon) currentIcon.innerText = dir === 1 ? "▲" : "▼";
+
+    rows.sort((a, b) => {
+        let valA = "", valB = "";
+        
+        if (type === 'date') {
+            valA = a.cells[0].innerText.trim();
+            valB = b.cells[0].innerText.trim();
+            return valA.localeCompare(valB) * dir;
+        } else if (type === 'text') {
+            valA = a.cells[colIndex].innerText.trim().toLowerCase();
+            valB = b.cells[colIndex].innerText.trim().toLowerCase();
+            return valA.localeCompare(valB) * dir;
+        } else if (type === 'select') {
+            const selA = a.cells[colIndex].querySelector("select");
+            const selB = b.cells[colIndex].querySelector("select");
+            valA = selA ? selA.options[selA.selectedIndex].text.trim().toLowerCase() : "";
+            valB = selB ? selB.options[selB.selectedIndex].text.trim().toLowerCase() : "";
+            return valA.localeCompare(valB) * dir;
+        } else if (type === 'amount') {
+            const textA = a.cells[colIndex].innerText.replace(/[\$,]/g, '').trim();
+            const textB = b.cells[colIndex].innerText.replace(/[\$,]/g, '').trim();
+            const numA = parseFloat(textA) || 0;
+            const numB = parseFloat(textB) || 0;
+            return (numA - numB) * dir;
+        }
+        return 0;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>
 {% endblock %}

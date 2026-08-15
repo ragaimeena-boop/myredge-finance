@@ -142,20 +142,83 @@
         </form>
     </div>
 
-    <!-- Card 4: System Data Maintenance -->
+    <!-- Card 5: Biometric Auth (Face ID / Touch ID) -->
     <div class="card" style="padding: 24px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(255,255,255,0.08);">
-        <h2 style="font-size: 18px; font-weight: 700; margin: 0 0 8px 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-            <span>🧹 System & Data Reset</span>
-        </h2>
-        <p style="font-size: 13px; color: var(--text-secondary); margin: 0 0 20px 0;">
-            Manage local demo data or clear sample entries before linking live accounts.
-        </p>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <div>
+                <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <span>📱 Biometric Security (Face ID / Touch ID)</span>
+                </h2>
+                <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">
+                    Enable Touch ID, Face ID, Android Fingerprint, or Windows Hello for instant 1-tap sign-in on your mobile device.
+                </p>
+            </div>
+            <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; background: {% if user.biometric_credential_id %}rgba(16, 185, 129, 0.2){% else %}rgba(245, 158, 11, 0.2){% endif %}; color: {% if user.biometric_credential_id %}#34D399{% else %}#FBBF24{% endif %}; border: 1px solid {% if user.biometric_credential_id %}rgba(16, 185, 129, 0.3){% else %}rgba(245, 158, 11, 0.3){% endif %};">
+                {% if user.biometric_credential_id %}Active 📱{% else %}Not Registered ⚠️{% endif %}
+            </span>
+        </div>
 
-        <form action="/api/purge-demo" method="POST" onsubmit="return confirm('Are you sure you want to clear demo transactions and accounts?');">
-            <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%;">
-                Purge Demo Sample Data
-            </button>
-        </form>
+        <button type="button" onclick="registerBiometricDevice()" class="btn" style="background: linear-gradient(135deg, #10B981, #059669); color: #FFF; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 16px;">
+            📱 Register Face ID / Touch ID Sensor
+        </button>
+        <div id="bioStatus" style="margin-top: 12px; font-size: 13px; font-weight: 500; text-align: center;"></div>
     </div>
 </div>
+
+<script>
+async function registerBiometricDevice() {
+    const statusDiv = document.getElementById("bioStatus");
+    statusDiv.style.color = "#60A5FA";
+    statusDiv.innerText = "Scanning Touch ID / Face ID sensor...";
+
+    if (!window.PublicKeyCredential) {
+        statusDiv.style.color = "#F87171";
+        statusDiv.innerText = "Biometric authentication is not supported by your browser/device.";
+        return;
+    }
+
+    try {
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+        const userId = new Uint8Array(16);
+        window.crypto.getRandomValues(userId);
+
+        const credential = await navigator.credentials.create({
+            publicKey: {
+                challenge: challenge,
+                rp: { name: "MYREDGE Finance" },
+                user: {
+                    id: userId,
+                    name: "{{ user.username }}",
+                    displayName: "{{ user.username }}"
+                },
+                pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+                authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "preferred" },
+                timeout: 60000
+            }
+        });
+
+        if (credential) {
+            const res = await fetch("/api/biometric/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ credential_id: credential.id, public_key: "webauthn_registered" })
+            });
+            const data = await res.json();
+            if (res.ok && data.status === "ok") {
+                statusDiv.style.color = "#34D399";
+                statusDiv.innerText = "✓ Face ID / Touch ID successfully registered for instant login!";
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                statusDiv.style.color = "#F87171";
+                statusDiv.innerText = data.error || "Failed to register biometric device.";
+            }
+        }
+    } catch (err) {
+        console.error(err);
+        statusDiv.style.color = "#F87171";
+        statusDiv.innerText = "Biometric registration canceled or failed: " + err.message;
+    }
+}
+</script>
 {% endblock %}

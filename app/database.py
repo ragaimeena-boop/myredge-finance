@@ -197,7 +197,7 @@ def init_db():
     );
     """)
 
-    # Users table for master credentials & 2FA
+    # Users table for master credentials, 2FA & WebAuthn Biometrics
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -205,10 +205,22 @@ def init_db():
         password_hash TEXT NOT NULL,
         totp_secret TEXT,
         is_totp_enabled INTEGER NOT NULL DEFAULT 0,
+        biometric_credential_id TEXT,
+        biometric_public_key TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     );
     """)
+
+    # Migrations for existing database instances
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN biometric_credential_id TEXT;")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN biometric_public_key TEXT;")
+    except Exception:
+        pass
 
     # User Settings table for session timeout
     cursor.execute("""

@@ -304,8 +304,11 @@ def get_ticker_ai_deep_dive(ticker: str, conn=None) -> Dict[str, Any]:
         # Fetch basic stock info via yfinance
         comp_name = f"{sym} Corporation"
         curr_price = 150.00
-        pe_ratio = "24.5"
-        market_cap = "$1.2T"
+        pe_ratio = "N/A"
+        market_cap = "N/A"
+        sector = "General Market"
+        industry = "Diversified"
+        summary = ""
         
         try:
             import yfinance as yf
@@ -314,14 +317,68 @@ def get_ticker_ai_deep_dive(ticker: str, conn=None) -> Dict[str, Any]:
             curr_price = getattr(info, 'last_price', 150.00) or getattr(info, 'regular_market_price', 150.00)
             if hasattr(t, 'info') and t.info:
                 comp_name = t.info.get('longName', comp_name)
-                pe_ratio = str(round(t.info.get('forwardPE', 24.5), 1))
+                sector = t.info.get('sector', sector)
+                industry = t.info.get('industry', industry)
+                summary = t.info.get('longBusinessSummary', '')[:600]
+                pe_val = t.info.get('forwardPE') or t.info.get('trailingPE')
+                if pe_val:
+                    pe_ratio = str(round(pe_val, 1))
                 mcap_val = t.info.get('marketCap', 0)
                 if mcap_val > 1e12:
                     market_cap = f"${round(mcap_val / 1e12, 2)}T"
                 elif mcap_val > 1e9:
                     market_cap = f"${round(mcap_val / 1e9, 2)}B"
+                elif mcap_val > 1e6:
+                    market_cap = f"${round(mcap_val / 1e6, 2)}M"
         except Exception:
             pass
+
+        # Call Gemini AI for dynamic, ticker-specific research
+        api_key = os.getenv("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", "")
+        rating = "Buy Opportunity"
+        thesis = f"{comp_name} ({sym}) operates in the {sector} ({industry}) sector. It demonstrates strong positioning with competitive moats, resilient financial health, and strategic exposure to secular growth trends."
+        bull_case = [
+            f"Strong market share in core {sector} and {industry} segments",
+            f"Favorable revenue growth and cash flow conversion metrics",
+            f"Strategic tailwinds from digital transformation and enterprise spending"
+        ]
+        bear_case = [
+            f"Macroeconomic sensitivity and valuation volatility in {sector}",
+            "Supply chain overhead and ongoing regulatory or interest rate headwinds"
+        ]
+
+        if api_key:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+            prompt = f"""
+            You are a Wall Street senior equity research analyst.
+            Generate a detailed, custom investment deep-dive research report for {comp_name} (Ticker: {sym}).
+            Sector: {sector}, Industry: {industry}.
+            Financial Metrics: P/E Ratio: {pe_ratio}, Market Cap: {market_cap}, Current Price: ${curr_price}.
+            Company Business Overview: {summary}
+
+            Provide:
+            1. rating: Exactly one of ("Strong Buy", "Buy Opportunity", "Hold / Watchlist", or "Speculative Upside")
+            2. thesis: A 2-3 sentence company-specific investment thesis detailing exact catalysts, technology, competitive moats, or growth drivers for {comp_name} ({sym}). Do NOT use generic templated filler text.
+            3. bull_case: Array of exactly 3 specific bullet points highlighting real products, revenue drivers, market share, or catalysts for {comp_name}.
+            4. bear_case: Array of exactly 2 specific bullet points detailing actual competitive, macro, regulatory, or margin risks for {comp_name}.
+
+            Return ONLY valid JSON with keys: "rating", "thesis", "bull_case", "bear_case".
+            """
+            try:
+                res = httpx.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=25.0)
+                if res.status_code == 200:
+                    text_content = res.json()['candidates'][0]['content']['parts'][0]['text']
+                    json_match = re.search(r'\{.*\}', text_content, re.DOTALL)
+                    if json_match:
+                        ai_data = json.loads(json_match.group(0))
+                        rating = ai_data.get("rating", rating)
+                        thesis = ai_data.get("thesis", thesis)
+                        if isinstance(ai_data.get("bull_case"), list) and len(ai_data["bull_case"]) >= 2:
+                            bull_case = ai_data["bull_case"]
+                        if isinstance(ai_data.get("bear_case"), list) and len(ai_data["bear_case"]) >= 2:
+                            bear_case = ai_data["bear_case"]
+            except Exception as e:
+                print(f"[STOCK DEEP DIVE WARNING] Gemini API call fallback for {sym}: {e}")
 
         report_payload = {
             "ticker": sym,
@@ -330,25 +387,20 @@ def get_ticker_ai_deep_dive(ticker: str, conn=None) -> Dict[str, Any]:
             "formatted_price": f"${round(curr_price, 2):,.2f}",
             "pe_ratio": pe_ratio,
             "market_cap": market_cap,
-            "rating": "Buy Opportunity",
-            "thesis": f"{comp_name} ({sym}) demonstrates strong market positioning with resilient balance sheet metrics, expanding gross margins, and strategic upside in core industry growth drivers.",
-            "bull_case": [
-                "Market leadership position in high-growth market segment",
-                "Strong return on equity (ROE) and expanding free cash flow conversion",
-                "High enterprise customer retention and pricing leverage"
-            ],
-            "bear_case": [
-                "Macroeconomic volatility and potential valuation compression",
-                "Short-term supply chain constraints or regulatory compliance overhead"
-            ],
+            "sector": sector,
+            "industry": industry,
+            "rating": rating,
+            "thesis": thesis,
+            "bull_case": bull_case,
+            "bear_case": bear_case,
             "articles": [
                 {
-                    "title": f"Recent Market Intelligence Analysis for {sym}",
+                    "title": f"Recent Market Intelligence & Earnings for {sym}",
                     "url": f"https://finance.yahoo.com/quote/{sym}",
                     "domain": "Yahoo Finance"
                 },
                 {
-                    "title": f"Securities Research & Industry Outlook: {sym}",
+                    "title": f"Securities Research & Valuation: {sym}",
                     "url": f"https://www.google.com/finance/quote/{sym}:NASDAQ",
                     "domain": "Google Finance"
                 }
