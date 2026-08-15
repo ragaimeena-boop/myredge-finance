@@ -3,6 +3,7 @@
 {% block title %}Stock Market & AI Deep Research - MYREDGE{% endblock %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 20px;">
     <div>
         <h1 style="font-size: 24px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px;">
@@ -230,35 +231,80 @@
     </div>
 </div>
 
-<!-- Modal for Ticker AI Deep Dive -->
-<div id="tickerModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999; justify-content: center; align-items: center; padding: 20px;">
-    <div class="card" style="background: #171A21; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; width: 100%; max-width: 680px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;">
+<!-- Modal for Ticker AI Deep Dive & Interactive Chart -->
+<div id="tickerModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 999; justify-content: center; align-items: center; padding: 20px;">
+    <div class="card" style="background: #12151C; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; width: 100%; max-width: 820px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); max-height: 92vh; overflow-y: auto;">
+        
+        <!-- Header -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
             <div>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <h2 id="modalTickerTitle" style="font-size: 22px; font-weight: 800; color: #3B82F6; margin: 0;"></h2>
-                    <span id="modalRating" style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);"></span>
+                    <h2 id="modalTickerTitle" style="font-size: 24px; font-weight: 800; color: #3B82F6; margin: 0;"></h2>
+                    <span id="modalRating" style="font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);"></span>
                 </div>
                 <span id="modalCompanyName" style="font-size: 14px; color: var(--text-secondary); display: block; margin-top: 2px;"></span>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <button id="reanalyzeBtn" onclick="runTickerResearch(currentModalTicker, true)" class="btn" style="padding: 4px 10px; font-size: 12px; background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; cursor: pointer; font-weight: 600;" title="Force fresh Gemini AI analysis for this ticker">
-                    🔄 Re-Analyze
+                <button id="reanalyzeBtn" onclick="runTickerResearch(currentModalTicker, true)" class="btn" style="padding: 6px 12px; font-size: 12px; background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; cursor: pointer; font-weight: 600;" title="Force fresh Gemini AI analysis for this ticker">
+                    🔄 Re-Analyze AI
                 </button>
-                <button id="closeModalBtn" style="background: transparent; border: none; color: #94A3B8; font-size: 20px; cursor: pointer;">✕</button>
+                <button id="closeModalBtn" style="background: transparent; border: none; color: #94A3B8; font-size: 22px; cursor: pointer; padding: 4px;">✕</button>
             </div>
         </div>
 
-        <div id="modalLoading" style="text-align: center; padding: 30px; color: #94A3B8;">
-            <div style="font-size: 24px; margin-bottom: 10px;">🤖</div>
-            <span>Analyzing ticker fundamental metrics & generating Gemini AI research report...</span>
+        <div id="modalLoading" style="text-align: center; padding: 40px; color: #94A3B8;">
+            <div style="font-size: 28px; margin-bottom: 12px;">🤖</div>
+            <span style="font-size: 15px; font-weight: 500;">Analyzing Yahoo Finance price history & generating Gemini AI research report...</span>
         </div>
 
         <div id="modalContent" style="display: none;">
+            
+            <!-- Live Price & Interactive Chart Section -->
+            <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 12px; margin-bottom: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: baseline; gap: 12px;">
+                        <span id="chartLivePrice" style="font-size: 26px; font-weight: 800; color: #FFF; font-variant-numeric: tabular-nums;"></span>
+                        <span id="chartLiveChange" style="font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 8px;"></span>
+                    </div>
+
+                    <!-- Timeframe Buttons: 1D, 5D, 1M, 6M, YTD, 1Y, 5Y, ALL -->
+                    <div id="chartTimeframes" style="display: flex; gap: 4px; background: rgba(255,255,255,0.05); padding: 3px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                        <button onclick="changeChartTimeframe('1D')" class="chart-tf-btn active" data-period="1D" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: #3B82F6; color: #FFF;">1D</button>
+                        <button onclick="changeChartTimeframe('5D')" class="chart-tf-btn" data-period="5D" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #94A3B8;">5D</button>
+                        <button onclick="changeChartTimeframe('1M')" class="chart-tf-btn" data-period="1M" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #94A3B8;">1M</button>
+                        <button onclick="changeChartTimeframe('6M')" class="chart-tf-btn" data-period="6M" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #94A3B8;">6M</button>
+                        <button onclick="changeChartTimeframe('YTD')" class="chart-tf-btn" data-period="YTD" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #94A3B8;">YTD</button>
+                        <button onclick="changeChartTimeframe('1Y')" class="chart-tf-btn" data-period="1Y" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #94A3B8;">1Y</button>
+                        <button onclick="changeChartTimeframe('5Y')" class="chart-tf-btn" data-period="5Y" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #94A3B8;">5Y</button>
+                        <button onclick="changeChartTimeframe('ALL')" class="chart-tf-btn" data-period="ALL" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #94A3B8;">ALL</button>
+                    </div>
+                </div>
+
+                <!-- Interactive Canvas Graph -->
+                <div style="height: 220px; position: relative;">
+                    <canvas id="stockPriceChartCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- "What's happening with [TSLA]?" Card (Yahoo Scout / Yahoo Finance Screenshot Layout) -->
+            <div style="background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.2); padding: 16px; border-radius: 12px; margin-bottom: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h3 style="font-size: 14.5px; font-weight: 800; color: #60A5FA; margin: 0; display: flex; align-items: center; gap: 8px;">
+                        <span>⚡ What's happening with <span id="whatsHappeningTicker"></span>?</span>
+                    </h3>
+                    <span style="font-size: 10px; color: #94A3B8; background: rgba(255,255,255,0.08); padding: 3px 8px; border-radius: 4px;">Powered by Gemini Scout</span>
+                </div>
+                <p id="modalWhatsHappening" style="font-size: 13.5px; line-height: 1.6; color: #E2E8F0; margin: 0 0 12px 0;"></p>
+                
+                <h4 style="font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px 0;">News Headlines & Market Coverage</h4>
+                <div id="modalNewsHeadlines" style="display: flex; flex-direction: column; gap: 6px;"></div>
+            </div>
+
+            <!-- Fundamentals Metrics -->
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; margin-bottom: 16px;">
                 <div>
-                    <span style="font-size: 11px; color: #94A3B8; display: block;">Live Price</span>
-                    <span id="modalPrice" style="font-size: 14px; font-weight: 700; color: #FFF;"></span>
+                    <span style="font-size: 11px; color: #94A3B8; display: block;">Target Price</span>
+                    <span id="modalTargetPrice" style="font-size: 14px; font-weight: 700; color: #60A5FA;"></span>
                 </div>
                 <div>
                     <span style="font-size: 11px; color: #94A3B8; display: block;">P/E Ratio</span>
@@ -274,12 +320,13 @@
                 </div>
             </div>
 
+            <!-- AI Thesis & Bull / Bear -->
             <div style="margin-bottom: 16px;">
                 <h4 style="font-size: 13px; font-weight: 700; color: #3B82F6; margin: 0 0 6px 0;">AI Investment Thesis</h4>
                 <p id="modalThesis" style="font-size: 13.5px; line-height: 1.5; color: #E2E8F0; margin: 0;"></p>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
                 <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 8px;">
                     <h4 style="font-size: 12px; font-weight: 700; color: #34D399; margin: 0 0 6px 0;">Bull Case Catalysts</h4>
                     <ul id="modalBullCase" style="margin: 0; padding-left: 14px; font-size: 12px; color: #CBD5E1; line-height: 1.5;"></ul>
@@ -288,11 +335,6 @@
                     <h4 style="font-size: 12px; font-weight: 700; color: #F87171; margin: 0 0 6px 0;">Bear Case Risks</h4>
                     <ul id="modalBearCase" style="margin: 0; padding-left: 14px; font-size: 12px; color: #CBD5E1; line-height: 1.5;"></ul>
                 </div>
-            </div>
-
-            <div>
-                <h4 style="font-size: 12px; font-weight: 700; color: #94A3B8; margin: 0 0 8px 0;">Verified Research Links</h4>
-                <div id="modalArticles" style="display: flex; flex-direction: column; gap: 6px;"></div>
             </div>
         </div>
     </div>
@@ -402,6 +444,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
+let stockPriceChart = null;
+
 function runTickerResearch(ticker, forceRefresh = false) {
     if (!ticker) return;
     currentModalTicker = ticker.toUpperCase();
@@ -415,6 +459,11 @@ function runTickerResearch(ticker, forceRefresh = false) {
     content.style.display = 'none';
 
     document.getElementById('modalTickerTitle').innerText = currentModalTicker;
+    const wtEl = document.getElementById('whatsHappeningTicker');
+    if (wtEl) wtEl.innerText = currentModalTicker;
+
+    // Fetch initial 1D chart
+    loadTickerChart(currentModalTicker, '1D');
 
     const url = `/api/stock-market/ticker/${encodeURIComponent(currentModalTicker)}${forceRefresh ? '?refresh=true' : ''}`;
 
@@ -423,21 +472,31 @@ function runTickerResearch(ticker, forceRefresh = false) {
         .then(data => {
             document.getElementById('modalCompanyName').innerText = data.company_name;
             document.getElementById('modalRating').innerText = data.rating || 'Buy Opportunity';
-            document.getElementById('modalPrice').innerText = data.formatted_price || ('$' + data.current_price);
+            document.getElementById('modalTargetPrice').innerText = data.target_price || 'N/A';
             document.getElementById('modalPE').innerText = data.pe_ratio || 'N/A';
             document.getElementById('modalMCap').innerText = data.market_cap || 'N/A';
             document.getElementById('modalMargin').innerText = data.profit_margins || 'N/A';
+            
+            const whEl = document.getElementById('modalWhatsHappening');
+            if (whEl) whEl.innerText = data.whats_happening || data.thesis;
+            
             document.getElementById('modalThesis').innerText = data.thesis;
 
             document.getElementById('modalBullCase').innerHTML = (data.bull_case || []).map(b => `<li>${b}</li>`).join('');
             document.getElementById('modalBearCase').innerHTML = (data.bear_case || []).map(b => `<li>${b}</li>`).join('');
 
-            document.getElementById('modalArticles').innerHTML = (data.articles || []).map(a => `
-                <a href="${a.url}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; color: #60A5FA; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.08); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.15);">
-                    <span>${a.title}</span>
-                    <span style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; color: #FFF;">${a.domain} ↗</span>
-                </a>
-            `).join('');
+            const nhEl = document.getElementById('modalNewsHeadlines');
+            if (nhEl) {
+                nhEl.innerHTML = (data.articles || []).map(a => `
+                    <a href="${a.url}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; color: #60A5FA; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span style="font-weight: 600; color: #E2E8F0;">${a.title}</span>
+                            ${a.summary ? `<span style="font-size: 11px; color: #94A3B8; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">${a.summary}</span>` : ''}
+                        </div>
+                        <span style="font-size: 10px; background: rgba(59, 130, 246, 0.15); padding: 3px 8px; border-radius: 4px; color: #60A5FA; white-space: nowrap; margin-left: 10px;">${a.publisher || 'Yahoo Finance'} ↗</span>
+                    </a>
+                `).join('');
+            }
 
             loading.style.display = 'none';
             content.style.display = 'block';
@@ -445,6 +504,121 @@ function runTickerResearch(ticker, forceRefresh = false) {
         .catch(err => {
             console.error('Ticker research error:', err);
             loading.innerText = 'Failed to fetch AI research for ticker.';
+        });
+}
+
+function changeChartTimeframe(period) {
+    document.querySelectorAll('.chart-tf-btn').forEach(btn => {
+        if (btn.getAttribute('data-period') === period) {
+            btn.style.background = '#3B82F6';
+            btn.style.color = '#FFF';
+        } else {
+            btn.style.background = 'transparent';
+            btn.style.color = '#94A3B8';
+        }
+    });
+    if (currentModalTicker) {
+        loadTickerChart(currentModalTicker, period);
+    }
+}
+
+function loadTickerChart(ticker, period = '1D') {
+    const url = `/api/stock-market/chart/${encodeURIComponent(ticker)}?period=${encodeURIComponent(period)}`;
+
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            const priceEl = document.getElementById('chartLivePrice');
+            const changeEl = document.getElementById('chartLiveChange');
+
+            if (priceEl && data.end_price) {
+                priceEl.innerText = '$' + data.end_price.toFixed(2);
+            }
+            if (changeEl) {
+                changeEl.innerText = data.formatted_change || '';
+                if (data.is_up) {
+                    changeEl.style.background = 'rgba(16, 185, 129, 0.15)';
+                    changeEl.style.color = '#34D399';
+                    changeEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                } else {
+                    changeEl.style.background = 'rgba(239, 68, 68, 0.15)';
+                    changeEl.style.color = '#F87171';
+                    changeEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                }
+            }
+
+            const ctx = document.getElementById('stockPriceChartCanvas');
+            if (!ctx) return;
+
+            if (stockPriceChart) {
+                stockPriceChart.destroy();
+            }
+
+            const colorHex = data.is_up ? '#34D399' : '#F87171';
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 200);
+            gradient.addColorStop(0, data.is_up ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+
+            stockPriceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.timestamps || [],
+                    datasets: [{
+                        label: `${ticker} Price ($)`,
+                        data: data.prices || [],
+                        borderColor: colorHex,
+                        borderWidth: 2,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.15,
+                        pointRadius: (data.prices || []).length > 60 ? 0 : 2,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: colorHex
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1E293B',
+                            titleColor: '#F8FAFC',
+                            bodyColor: colorHex,
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `$${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: { color: '#64748B', font: { size: 10 }, maxTicksLimit: 7 }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                            ticks: {
+                                color: '#64748B',
+                                font: { size: 10 },
+                                callback: function(value) { return '$' + value; }
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(err => {
+            console.error('Stock chart error:', err);
         });
 }
 

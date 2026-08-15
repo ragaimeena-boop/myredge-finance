@@ -581,6 +581,12 @@ def get_ticker_analysis(ticker: str, refresh: bool = Query(default=False)):
     finally:
         conn.close()
 
+@app.get("/api/stock-market/chart/{ticker}")
+def get_ticker_chart(ticker: str, period: str = Query(default="1d")):
+    """Get interactive historical price chart points for a stock ticker."""
+    from app.stock_market import get_stock_chart_data
+    return get_stock_chart_data(ticker, period=period)
+
 # --- Authentication & Settings Endpoints ---
 
 @app.get("/setup-admin", response_class=HTMLResponse)

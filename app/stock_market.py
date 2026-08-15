@@ -368,10 +368,37 @@ def get_ticker_ai_deep_dive(ticker: str, force_refresh: bool = False, conn=None)
         except Exception as e:
             print(f"[YFINANCE FETCH WARNING] {sym}: {e}")
 
+        # Fetch live news headlines via yfinance
+        news_items = []
+        news_summary_text = ""
+        try:
+            if hasattr(t, 'news') and t.news:
+                for n in t.news[:6]:
+                    c = n.get('content', {})
+                    t_title = c.get('title')
+                    t_sum = c.get('summary', '')
+                    t_pub = c.get('provider', {}).get('displayName', 'Yahoo Finance')
+                    t_url = c.get('canonicalUrl', {}).get('url') or c.get('clickThroughUrl', {}).get('url') or f"https://finance.yahoo.com/quote/{sym}"
+                    if t_title:
+                        news_items.append({
+                            "title": t_title,
+                            "summary": t_sum,
+                            "publisher": t_pub,
+                            "url": t_url
+                        })
+                if news_items:
+                    news_summary_text = "\n".join([f"- {item['title']} ({item['publisher']})" for item in news_items])
+        except Exception as e:
+            print(f"[NEWS FETCH WARNING] {sym}: {e}")
+
         # Construct specific stock analytical baseline
         rating = recommendation_str if recommendation_str in ["Strong Buy", "Buy Opportunity", "Hold / Watchlist", "Buy", "Hold"] else "Buy Opportunity"
         thesis = f"{comp_name} ({sym}) is a prominent player in the {sector} sector ({industry}). With a market capitalization of {market_cap} and P/E ratio of {pe_ratio}, the company's valuation reflects its competitive positioning and recent financial performance."
         
+        whats_happening = f"{comp_name} ({sym}) has recently seen active trading around ${round(curr_price, 2)}. Key market drivers include its recent quarterly revenue growth trajectory ({rev_growth_str}), gross profit margin strength ({profit_margin_str}), and broader sector developments in {sector}."
+        if news_items:
+            whats_happening += f" Top recent market focus: '{news_items[0]['title']}'."
+
         bull_case = [
             f"{comp_name} ({sym}) maintains a leading position in the {industry} industry with strong brand equity and business moats.",
             f"Financial strength highlighted by profit margins of {profit_margin_str} and revenue growth trajectory of {rev_growth_str}.",
@@ -405,18 +432,21 @@ def get_ticker_ai_deep_dive(ticker: str, force_refresh: bool = False, conn=None)
             - Analyst Price Target: {target_price_str}
             - 52-Week Range: {fifty_two_range}
             - Business Overview: {summary}
+            - Recent News Headlines:
+            {news_summary_text}
 
             MANDATORY INSTRUCTIONS:
-            - You MUST tailor all analysis specifically to {comp_name} ({sym}). Mention exact product lines, technology, or business units (e.g. for TSM mention wafer foundry/3nm/2nm/CoWoS packaging; for NVDA mention Blackwell/Hopper GPUs/CUDA; for AAPL mention iPhone/Services/M-series chips).
+            - You MUST tailor all analysis specifically to {comp_name} ({sym}). Mention exact product lines, technology, or business units.
             - Do NOT use generic placeholder sentences or generic market templates.
 
             Provide:
             1. rating: Exactly one of ("Strong Buy", "Buy Opportunity", "Hold / Watchlist", or "Speculative Upside")
-            2. thesis: A 2-3 sentence company-specific investment thesis detailing exact catalysts, technology, competitive moats, or growth drivers for {comp_name} ({sym}).
-            3. bull_case: Array of exactly 3 specific bullet points highlighting real products, revenue drivers, market share, or catalysts for {comp_name} ({sym}).
-            4. bear_case: Array of exactly 2 specific bullet points detailing actual competitive, macro, regulatory, or margin risks for {comp_name} ({sym}).
+            2. whats_happening: A 2-3 sentence real-time overview summarizing current market events, earnings/guidance, stock movements, and recent headlines for {comp_name} ({sym}). Style like Yahoo Scout / Yahoo Finance market summary.
+            3. thesis: A 2-3 sentence company-specific investment thesis detailing exact catalysts, technology, competitive moats, or growth drivers for {comp_name} ({sym}).
+            4. bull_case: Array of exactly 3 specific bullet points highlighting real products, revenue drivers, market share, or catalysts for {comp_name} ({sym}).
+            5. bear_case: Array of exactly 2 specific bullet points detailing actual competitive, macro, regulatory, or margin risks for {comp_name} ({sym}).
 
-            Return ONLY valid JSON with keys: "rating", "thesis", "bull_case", "bear_case".
+            Return ONLY valid JSON with keys: "rating", "whats_happening", "thesis", "bull_case", "bear_case".
             """
             try:
                 res = httpx.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=25.0)
@@ -427,6 +457,8 @@ def get_ticker_ai_deep_dive(ticker: str, force_refresh: bool = False, conn=None)
                         ai_data = json.loads(json_match.group(0))
                         if ai_data.get("rating"):
                             rating = ai_data["rating"]
+                        if ai_data.get("whats_happening"):
+                            whats_happening = ai_data["whats_happening"]
                         if ai_data.get("thesis"):
                             thesis = ai_data["thesis"]
                         if isinstance(ai_data.get("bull_case"), list) and len(ai_data["bull_case"]) >= 2:
@@ -435,6 +467,22 @@ def get_ticker_ai_deep_dive(ticker: str, force_refresh: bool = False, conn=None)
                             bear_case = ai_data["bear_case"]
             except Exception as e:
                 print(f"[STOCK DEEP DIVE WARNING] Gemini API call error for {sym}: {e}")
+
+        # Standardize news links
+        articles_list = news_items if news_items else [
+            {
+                "title": f"Recent Market Intelligence & Financial Filings for {sym}",
+                "summary": "Latest securities filings and market updates.",
+                "publisher": "Yahoo Finance",
+                "url": f"https://finance.yahoo.com/quote/{sym}"
+            },
+            {
+                "title": f"Securities Research & Price Targets: {sym}",
+                "summary": "Analyst ratings and price target revisions.",
+                "publisher": "Google Finance",
+                "url": f"https://www.google.com/finance/quote/{sym}:NASDAQ"
+            }
+        ]
 
         report_payload = {
             "ticker": sym,
@@ -450,21 +498,11 @@ def get_ticker_ai_deep_dive(ticker: str, force_refresh: bool = False, conn=None)
             "target_price": target_price_str,
             "fifty_two_range": fifty_two_range,
             "rating": rating,
+            "whats_happening": whats_happening,
             "thesis": thesis,
             "bull_case": bull_case,
             "bear_case": bear_case,
-            "articles": [
-                {
-                    "title": f"Recent Market Intelligence & Financial Filings for {sym}",
-                    "url": f"https://finance.yahoo.com/quote/{sym}",
-                    "domain": "Yahoo Finance"
-                },
-                {
-                    "title": f"Securities Research & Price Targets: {sym}",
-                    "url": f"https://www.google.com/finance/quote/{sym}:NASDAQ",
-                    "domain": "Google Finance"
-                }
-            ]
+            "articles": articles_list
         }
 
         now_str = current_eastern_time().isoformat()
@@ -478,3 +516,65 @@ def get_ticker_ai_deep_dive(ticker: str, force_refresh: bool = False, conn=None)
     finally:
         if close_conn:
             conn.close()
+
+def get_stock_chart_data(ticker: str, period: str = "1d") -> Dict[str, Any]:
+    """Fetch historical price chart data points for interactive line graph."""
+    sym = ticker.strip().upper()
+    period_map = {
+        "1d": ("1d", "5m"),
+        "5d": ("5d", "15m"),
+        "1m": ("1mo", "1d"),
+        "6m": ("6mo", "1d"),
+        "ytd": ("ytd", "1d"),
+        "1y": ("1y", "1d"),
+        "5y": ("5y", "1wk"),
+        "all": ("max", "1mo")
+    }
+    yf_period, yf_interval = period_map.get(period.lower(), ("1d", "5m"))
+
+    timestamps = []
+    prices = []
+    start_price = 0.0
+    end_price = 0.0
+    change = 0.0
+    pct_change = 0.0
+    is_up = True
+
+    try:
+        import yfinance as yf
+        t = yf.Ticker(sym)
+        df = t.history(period=yf_period, interval=yf_interval)
+        if not df.empty and 'Close' in df.columns:
+            df = df.dropna(subset=['Close'])
+            for idx, row in df.iterrows():
+                if period.lower() in ["1d", "5d"]:
+                    fmt_time = idx.strftime('%m/%d %I:%M %p') if period.lower() == "5d" else idx.strftime('%I:%M %p')
+                elif period.lower() in ["1m", "6m", "ytd", "1y"]:
+                    fmt_time = idx.strftime('%b %d, %Y')
+                else:
+                    fmt_time = idx.strftime('%b %Y')
+                timestamps.append(fmt_time)
+                prices.append(round(float(row['Close']), 2))
+            
+            if prices:
+                start_price = prices[0]
+                end_price = prices[-1]
+                change = round(end_price - start_price, 2)
+                if start_price > 0:
+                    pct_change = round(((end_price - start_price) / start_price) * 100, 2)
+                is_up = change >= 0
+    except Exception as e:
+        print(f"[CHART DATA ERROR] {sym} ({period}): {e}")
+
+    return {
+        "ticker": sym,
+        "period": period.upper(),
+        "timestamps": timestamps,
+        "prices": prices,
+        "start_price": start_price,
+        "end_price": end_price,
+        "change": change,
+        "pct_change": pct_change,
+        "is_up": is_up,
+        "formatted_change": f"{'+' if is_up else ''}${change:,.2f} ({'+' if is_up else ''}{pct_change}%)"
+    }
