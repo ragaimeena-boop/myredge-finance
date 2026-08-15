@@ -30,15 +30,15 @@
 
 <div class="card">
     <div class="card-title">Active Subscriptions & Recurring Services</div>
-    <div class="table-container">
-        <table>
-            <thead>
+    <div class="table-container" style="max-height: 70vh; overflow-y: auto;">
+        <table id="subsTable">
+            <thead style="position: sticky; top: 0; z-index: 10; background-color: var(--surface-color); box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
                 <tr>
-                    <th>Merchant / Service</th>
-                    <th>Category</th>
-                    <th>Last Billed Date</th>
-                    <th style="text-align: right;">Monthly Cost</th>
-                    <th style="text-align: right;">Action</th>
+                    <th onclick="sortTable('subsTable', 0, 'text')" style="cursor: pointer; user-select: none; white-space: nowrap;">Merchant / Service <span class="sort-icon" style="font-size: 11px; opacity: 0.7;">↕</span></th>
+                    <th onclick="sortTable('subsTable', 1, 'text')" style="cursor: pointer; user-select: none; white-space: nowrap;">Category <span class="sort-icon" style="font-size: 11px; opacity: 0.7;">↕</span></th>
+                    <th onclick="sortTable('subsTable', 2, 'date')" style="cursor: pointer; user-select: none; white-space: nowrap;">Last Billed Date <span class="sort-icon" style="font-size: 11px; opacity: 0.7;">↕</span></th>
+                    <th onclick="sortTable('subsTable', 3, 'amount')" style="text-align: right; cursor: pointer; user-select: none; white-space: nowrap;">Monthly Cost <span class="sort-icon" style="font-size: 11px; opacity: 0.7;">↕</span></th>
+                    <th style="text-align: right; white-space: nowrap;">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -72,4 +72,54 @@
         </table>
     </div>
 </div>
+
+<script>
+const sortDirsMap = {};
+
+function sortTable(tableId, colIndex, type) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const tbody = table.querySelector("tbody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    if (rows.length <= 1 && rows[0] && rows[0].cells.length <= 1) return;
+
+    const key = tableId + "_" + colIndex;
+    const dir = (sortDirsMap[key] || 1);
+    sortDirsMap[key] = -dir;
+
+    const headers = table.querySelectorAll("thead th");
+    headers.forEach(th => {
+        const icon = th.querySelector(".sort-icon");
+        if (icon) icon.innerText = "↕";
+    });
+
+    const activeHeader = headers[colIndex];
+    if (activeHeader) {
+        const icon = activeHeader.querySelector(".sort-icon");
+        if (icon) icon.innerText = dir === 1 ? "▲" : "▼";
+    }
+
+    rows.sort((a, b) => {
+        let valA = "", valB = "";
+        if (type === 'date') {
+            valA = a.cells[colIndex].innerText.trim();
+            valB = b.cells[colIndex].innerText.trim();
+            return valA.localeCompare(valB) * dir;
+        } else if (type === 'text') {
+            valA = a.cells[colIndex].innerText.trim().toLowerCase();
+            valB = b.cells[colIndex].innerText.trim().toLowerCase();
+            return valA.localeCompare(valB) * dir;
+        } else if (type === 'amount') {
+            const textA = a.cells[colIndex].innerText.replace(/[\$,]/g, '').trim();
+            const textB = b.cells[colIndex].innerText.replace(/[\$,]/g, '').trim();
+            const numA = parseFloat(textA) || 0;
+            const numB = parseFloat(textB) || 0;
+            return (numA - numB) * dir;
+        }
+        return 0;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>
 {% endblock %}
