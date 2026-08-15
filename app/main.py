@@ -63,7 +63,7 @@ def run_daily_sync():
             else:
                 return
 
-        ingest_simplefin_data(data, conn=conn)
+        return ingest_simplefin_data(data, conn=conn)
     finally:
         conn.close()
 
@@ -171,6 +171,8 @@ def read_dashboard(request: Request):
         sync_status = request.query_params.get("sync")
         sync_error = request.query_params.get("sync_error")
         demo_purged = request.query_params.get("demo_purged")
+        acc_cnt = request.query_params.get("acc_cnt")
+        tx_cnt = request.query_params.get("tx_cnt")
 
         return templates.TemplateResponse(request=request, name="index.html", context={
             "active_page": "dashboard",
@@ -180,7 +182,9 @@ def read_dashboard(request: Request):
             "sync_status": sync_status,
             "sync_error": sync_error,
             "has_demo_data": has_demo_data,
-            "demo_purged": demo_purged
+            "demo_purged": demo_purged,
+            "acc_cnt": acc_cnt,
+            "tx_cnt": tx_cnt
         })
     finally:
         conn.close()
@@ -430,8 +434,10 @@ def read_investments(request: Request):
 def trigger_manual_sync():
     """Manual sync trigger endpoint."""
     try:
-        run_daily_sync()
-        return RedirectResponse(url="/?sync=success", status_code=303)
+        stats = run_daily_sync()
+        acc_cnt = stats.get("accounts_synced", 0) if stats else 0
+        tx_cnt = stats.get("transactions_synced", 0) if stats else 0
+        return RedirectResponse(url=f"/?sync=success&acc_cnt={acc_cnt}&tx_cnt={tx_cnt}", status_code=303)
     except Exception as e:
         print(f"[SYNC ERROR] Manual sync failed: {e}")
         return RedirectResponse(url=f"/?sync_error={e}", status_code=303)

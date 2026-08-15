@@ -19,7 +19,12 @@
 
 {% if sync_status == 'success' %}
 <div class="alert alert-success" style="background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.4); color: #2ecc71; padding: 14px 18px; border-radius: 10px; margin-bottom: 24px; font-weight: 500;">
-    ✓ SimpleFIN sync completed successfully! Account balances and transactions are up to date.
+    ✓ SimpleFIN sync completed successfully! 
+    {% if acc_cnt or tx_cnt %}
+        Fetched & verified <strong>{{ acc_cnt or 0 }} account(s)</strong> and <strong>{{ tx_cnt or 0 }} transaction record(s)</strong> from SimpleFIN Bridge.
+    {% else %}
+        Account balances and transactions are up to date.
+    {% endif %}
 </div>
 {% elif sync_error %}
 <div class="alert alert-danger" style="background: rgba(231, 76, 60, 0.12); border: 1px solid rgba(231, 76, 60, 0.4); color: #e74c3c; padding: 14px 18px; border-radius: 10px; margin-bottom: 24px; font-weight: 500;">
