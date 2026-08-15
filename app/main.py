@@ -572,12 +572,12 @@ def trigger_stock_market_refresh():
         conn.close()
 
 @app.get("/api/stock-market/ticker/{ticker}")
-def get_ticker_analysis(ticker: str):
+def get_ticker_analysis(ticker: str, refresh: bool = Query(default=False)):
     """Get instant AI deep dive report for a given stock ticker."""
     from app.stock_market import get_ticker_ai_deep_dive
     conn = get_connection()
     try:
-        return get_ticker_ai_deep_dive(ticker, conn=conn)
+        return get_ticker_ai_deep_dive(ticker, force_refresh=refresh, conn=conn)
     finally:
         conn.close()
 

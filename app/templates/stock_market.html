@@ -232,33 +232,45 @@
 
 <!-- Modal for Ticker AI Deep Dive -->
 <div id="tickerModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999; justify-content: center; align-items: center; padding: 20px;">
-    <div class="card" style="background: #171A21; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; width: 100%; max-width: 650px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;">
+    <div class="card" style="background: #171A21; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; width: 100%; max-width: 680px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
             <div>
-                <h2 id="modalTickerTitle" style="font-size: 22px; font-weight: 800; color: #3B82F6; margin: 0;"></h2>
-                <span id="modalCompanyName" style="font-size: 14px; color: var(--text-secondary);"></span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h2 id="modalTickerTitle" style="font-size: 22px; font-weight: 800; color: #3B82F6; margin: 0;"></h2>
+                    <span id="modalRating" style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);"></span>
+                </div>
+                <span id="modalCompanyName" style="font-size: 14px; color: var(--text-secondary); display: block; margin-top: 2px;"></span>
             </div>
-            <button id="closeModalBtn" style="background: transparent; border: none; color: #94A3B8; font-size: 20px; cursor: pointer;">✕</button>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button id="reanalyzeBtn" onclick="runTickerResearch(currentModalTicker, true)" class="btn" style="padding: 4px 10px; font-size: 12px; background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; cursor: pointer; font-weight: 600;" title="Force fresh Gemini AI analysis for this ticker">
+                    🔄 Re-Analyze
+                </button>
+                <button id="closeModalBtn" style="background: transparent; border: none; color: #94A3B8; font-size: 20px; cursor: pointer;">✕</button>
+            </div>
         </div>
 
         <div id="modalLoading" style="text-align: center; padding: 30px; color: #94A3B8;">
             <div style="font-size: 24px; margin-bottom: 10px;">🤖</div>
-            <span>Generating Gemini AI research report...</span>
+            <span>Analyzing ticker fundamental metrics & generating Gemini AI research report...</span>
         </div>
 
         <div id="modalContent" style="display: none;">
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; margin-bottom: 16px;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; margin-bottom: 16px;">
                 <div>
                     <span style="font-size: 11px; color: #94A3B8; display: block;">Live Price</span>
-                    <span id="modalPrice" style="font-size: 15px; font-weight: 700; color: #FFF;"></span>
+                    <span id="modalPrice" style="font-size: 14px; font-weight: 700; color: #FFF;"></span>
                 </div>
                 <div>
                     <span style="font-size: 11px; color: #94A3B8; display: block;">P/E Ratio</span>
-                    <span id="modalPE" style="font-size: 15px; font-weight: 700; color: #FFF;"></span>
+                    <span id="modalPE" style="font-size: 14px; font-weight: 700; color: #FFF;"></span>
                 </div>
                 <div>
                     <span style="font-size: 11px; color: #94A3B8; display: block;">Market Cap</span>
-                    <span id="modalMCap" style="font-size: 15px; font-weight: 700; color: #FFF;"></span>
+                    <span id="modalMCap" style="font-size: 14px; font-weight: 700; color: #FFF;"></span>
+                </div>
+                <div>
+                    <span style="font-size: 11px; color: #94A3B8; display: block;">Profit Margin</span>
+                    <span id="modalMargin" style="font-size: 14px; font-weight: 700; color: #34D399;"></span>
                 </div>
             </div>
 
@@ -292,6 +304,8 @@
 </div>
 
 <script>
+let currentModalTicker = '';
+
 document.addEventListener("DOMContentLoaded", function() {
     const moversData = {{ research.top_movers | tojson }};
     const tableBody = document.getElementById('moversTableBody');
@@ -300,12 +314,9 @@ document.addEventListener("DOMContentLoaded", function() {
     const tabLosers = document.getElementById('tabLosers');
     const tabActive = document.getElementById('tabActive');
 
-    const activeTabStyle = "padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background: var(--surface-hover); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;";
-    const inactiveTabStyle = "padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; color: var(--text-secondary); border: none; background: transparent; cursor: pointer;";
-
-    function renderMoversTable(items) {
-        if (!tableBody || !items) return;
-        tableBody.innerHTML = items.map(item => `
+    function renderMovers(items) {
+        if (!tableBody) return;
+        tableBody.innerHTML = (items || []).map(item => `
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13.5px;">
                 <td style="padding: 12px 16px; font-weight: 700; color: #3B82F6;">${item.symbol}</td>
                 <td style="padding: 12px 16px; color: var(--text-primary);">${item.name}</td>
@@ -329,43 +340,57 @@ document.addEventListener("DOMContentLoaded", function() {
 
     if (tabGainers) {
         tabGainers.addEventListener('click', function() {
-            [tabGainers, tabLosers, tabActive].forEach(t => t.style.cssText = inactiveTabStyle);
-            tabGainers.style.cssText = activeTabStyle;
-            renderMoversTable(moversData.gainers);
+            renderMovers(moversData.gainers);
+            setActiveTab(tabGainers);
         });
     }
-
     if (tabLosers) {
         tabLosers.addEventListener('click', function() {
-            [tabGainers, tabLosers, tabActive].forEach(t => t.style.cssText = inactiveTabStyle);
-            tabLosers.style.cssText = activeTabStyle;
-            renderMoversTable(moversData.losers);
+            renderMovers(moversData.losers);
+            setActiveTab(tabLosers);
         });
     }
-
     if (tabActive) {
         tabActive.addEventListener('click', function() {
-            [tabGainers, tabLosers, tabActive].forEach(t => t.style.cssText = inactiveTabStyle);
-            tabActive.style.cssText = activeTabStyle;
-            renderMoversTable(moversData.active);
+            renderMovers(moversData.active);
+            setActiveTab(tabActive);
         });
     }
 
-    // Modal Search Handlers
+    function setActiveTab(activeBtn) {
+        [tabGainers, tabLosers, tabActive].forEach(btn => {
+            if (btn) {
+                btn.style.background = 'transparent';
+                btn.style.color = 'var(--text-secondary)';
+                btn.style.border = 'none';
+            }
+        });
+        if (activeBtn) {
+            activeBtn.style.background = 'var(--surface-hover)';
+            activeBtn.style.color = 'var(--text-primary)';
+            activeBtn.style.border = '1px solid rgba(255,255,255,0.1)';
+        }
+    }
+
     const searchBtn = document.getElementById('searchTickerBtn');
-    const inputEl = document.getElementById('tickerInput');
+    const tickerInput = document.getElementById('tickerInput');
     const modal = document.getElementById('tickerModal');
     const closeModal = document.getElementById('closeModalBtn');
 
-    if (searchBtn && inputEl) {
+    if (searchBtn && tickerInput) {
         searchBtn.addEventListener('click', function() {
-            const val = inputEl.value.trim();
-            if (val) runTickerResearch(val);
+            const sym = tickerInput.value.trim();
+            if (sym) {
+                runTickerResearch(sym);
+            }
         });
-        inputEl.addEventListener('keypress', function(e) {
+
+        tickerInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                const val = inputEl.value.trim();
-                if (val) runTickerResearch(val);
+                const sym = tickerInput.value.trim();
+                if (sym) {
+                    runTickerResearch(sym);
+                }
             }
         });
     }
@@ -377,7 +402,10 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-function runTickerResearch(ticker) {
+function runTickerResearch(ticker, forceRefresh = false) {
+    if (!ticker) return;
+    currentModalTicker = ticker.toUpperCase();
+
     const modal = document.getElementById('tickerModal');
     const loading = document.getElementById('modalLoading');
     const content = document.getElementById('modalContent');
@@ -386,15 +414,19 @@ function runTickerResearch(ticker) {
     loading.style.display = 'block';
     content.style.display = 'none';
 
-    document.getElementById('modalTickerTitle').innerText = ticker.toUpperCase();
+    document.getElementById('modalTickerTitle').innerText = currentModalTicker;
 
-    fetch(`/api/stock-market/ticker/${encodeURIComponent(ticker)}`)
+    const url = `/api/stock-market/ticker/${encodeURIComponent(currentModalTicker)}${forceRefresh ? '?refresh=true' : ''}`;
+
+    fetch(url)
         .then(res => res.json())
         .then(data => {
             document.getElementById('modalCompanyName').innerText = data.company_name;
+            document.getElementById('modalRating').innerText = data.rating || 'Buy Opportunity';
             document.getElementById('modalPrice').innerText = data.formatted_price || ('$' + data.current_price);
             document.getElementById('modalPE').innerText = data.pe_ratio || 'N/A';
             document.getElementById('modalMCap').innerText = data.market_cap || 'N/A';
+            document.getElementById('modalMargin').innerText = data.profit_margins || 'N/A';
             document.getElementById('modalThesis').innerText = data.thesis;
 
             document.getElementById('modalBullCase').innerHTML = (data.bull_case || []).map(b => `<li>${b}</li>`).join('');

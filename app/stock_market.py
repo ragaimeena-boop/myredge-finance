@@ -286,7 +286,7 @@ def generate_daily_ai_research(conn=None, force_refresh: bool = False) -> Dict[s
         if close_conn:
             conn.close()
 
-def get_ticker_ai_deep_dive(ticker: str, conn=None) -> Dict[str, Any]:
+def get_ticker_ai_deep_dive(ticker: str, force_refresh: bool = False, conn=None) -> Dict[str, Any]:
     """Generate or retrieve on-demand AI stock research deep dive for a given ticker."""
     sym = ticker.strip().upper()
     close_conn = False
@@ -296,19 +296,30 @@ def get_ticker_ai_deep_dive(ticker: str, conn=None) -> Dict[str, Any]:
 
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM ticker_deep_dives WHERE ticker = ?;", (sym,))
-        row = cursor.fetchone()
-        if row:
-            return json.loads(row["ai_report_json"])
+        if not force_refresh:
+            cursor.execute("SELECT * FROM ticker_deep_dives WHERE ticker = ?;", (sym,))
+            row = cursor.fetchone()
+            if row:
+                cached_payload = json.loads(row["ai_report_json"])
+                # Auto-invalidate old generic templated caches
+                thesis_text = cached_payload.get("thesis", "")
+                bull_list = " ".join(cached_payload.get("bull_case", []))
+                if "demonstrates strong market positioning" not in thesis_text and "Strong market share in core" not in bull_list:
+                    return cached_payload
 
-        # Fetch basic stock info via yfinance
+        # Fetch detailed stock info & fundamentals via yfinance
         comp_name = f"{sym} Corporation"
         curr_price = 150.00
         pe_ratio = "N/A"
         market_cap = "N/A"
-        sector = "General Market"
-        industry = "Diversified"
+        sector = "Technology & Global Markets"
+        industry = "Diversified Growth"
         summary = ""
+        profit_margin_str = "N/A"
+        rev_growth_str = "N/A"
+        target_price_str = "N/A"
+        fifty_two_range = "N/A"
+        recommendation_str = "Buy Opportunity"
         
         try:
             import yfinance as yf
@@ -316,51 +327,94 @@ def get_ticker_ai_deep_dive(ticker: str, conn=None) -> Dict[str, Any]:
             info = t.fast_info
             curr_price = getattr(info, 'last_price', 150.00) or getattr(info, 'regular_market_price', 150.00)
             if hasattr(t, 'info') and t.info:
-                comp_name = t.info.get('longName', comp_name)
-                sector = t.info.get('sector', sector)
-                industry = t.info.get('industry', industry)
-                summary = t.info.get('longBusinessSummary', '')[:600]
-                pe_val = t.info.get('forwardPE') or t.info.get('trailingPE')
+                inf = t.info
+                comp_name = inf.get('longName', comp_name)
+                sector = inf.get('sector', sector)
+                industry = inf.get('industry', industry)
+                summary = inf.get('longBusinessSummary', '')[:700]
+                
+                pe_val = inf.get('forwardPE') or inf.get('trailingPE')
                 if pe_val:
                     pe_ratio = str(round(pe_val, 1))
-                mcap_val = t.info.get('marketCap', 0)
+                
+                mcap_val = inf.get('marketCap', 0)
                 if mcap_val > 1e12:
                     market_cap = f"${round(mcap_val / 1e12, 2)}T"
                 elif mcap_val > 1e9:
                     market_cap = f"${round(mcap_val / 1e9, 2)}B"
                 elif mcap_val > 1e6:
                     market_cap = f"${round(mcap_val / 1e6, 2)}M"
-        except Exception:
-            pass
 
-        # Call Gemini AI for dynamic, ticker-specific research
-        api_key = os.getenv("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", "")
-        rating = "Buy Opportunity"
-        thesis = f"{comp_name} ({sym}) operates in the {sector} ({industry}) sector. It demonstrates strong positioning with competitive moats, resilient financial health, and strategic exposure to secular growth trends."
+                pm = inf.get('profitMargins')
+                if pm is not None:
+                    profit_margin_str = f"{round(pm * 100, 1)}%"
+
+                rg = inf.get('revenueGrowth')
+                if rg is not None:
+                    rev_growth_str = f"{'+' if rg >= 0 else ''}{round(rg * 100, 1)}%"
+
+                tp = inf.get('targetMeanPrice')
+                if tp:
+                    target_price_str = f"${round(tp, 2)}"
+
+                high_52 = inf.get('fiftyTwoWeekHigh')
+                low_52 = inf.get('fiftyTwoWeekLow')
+                if high_52 and low_52:
+                    fifty_two_range = f"${round(low_52, 2)} - ${round(high_52, 2)}"
+
+                rec = inf.get('recommendationKey', '').replace('_', ' ').title()
+                if rec:
+                    recommendation_str = rec
+        except Exception as e:
+            print(f"[YFINANCE FETCH WARNING] {sym}: {e}")
+
+        # Construct specific stock analytical baseline
+        rating = recommendation_str if recommendation_str in ["Strong Buy", "Buy Opportunity", "Hold / Watchlist", "Buy", "Hold"] else "Buy Opportunity"
+        thesis = f"{comp_name} ({sym}) is a prominent player in the {sector} sector ({industry}). With a market capitalization of {market_cap} and P/E ratio of {pe_ratio}, the company's valuation reflects its competitive positioning and recent financial performance."
+        
         bull_case = [
-            f"Strong market share in core {sector} and {industry} segments",
-            f"Favorable revenue growth and cash flow conversion metrics",
-            f"Strategic tailwinds from digital transformation and enterprise spending"
+            f"{comp_name} ({sym}) maintains a leading position in the {industry} industry with strong brand equity and business moats.",
+            f"Financial strength highlighted by profit margins of {profit_margin_str} and revenue growth trajectory of {rev_growth_str}.",
+            f"Wall Street analyst consensus price target of {target_price_str} provides positive upside catalyst relative to 52-week trading bounds ({fifty_two_range})."
         ]
+        
         bear_case = [
-            f"Macroeconomic sensitivity and valuation volatility in {sector}",
-            "Supply chain overhead and ongoing regulatory or interest rate headwinds"
+            f"Exposure to cyclical macroeconomic headwinds, sector regulation, and competitive margin pressures in {sector}.",
+            f"Potential valuation compression if quarterly revenue growth ({rev_growth_str}) or earnings guidance decelerates."
         ]
+
+        # Call Gemini AI for deeper ticker-specific intelligence
+        api_key = os.getenv("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", "")
 
         if api_key:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
             prompt = f"""
             You are a Wall Street senior equity research analyst.
             Generate a detailed, custom investment deep-dive research report for {comp_name} (Ticker: {sym}).
-            Sector: {sector}, Industry: {industry}.
-            Financial Metrics: P/E Ratio: {pe_ratio}, Market Cap: {market_cap}, Current Price: ${curr_price}.
-            Company Business Overview: {summary}
+            
+            Company Context & Fundamentals:
+            - Ticker: {sym}
+            - Company Name: {comp_name}
+            - Sector: {sector}
+            - Industry: {industry}
+            - Live Price: ${curr_price}
+            - P/E Ratio: {pe_ratio}
+            - Market Cap: {market_cap}
+            - Profit Margins: {profit_margin_str}
+            - Revenue Growth YoY: {rev_growth_str}
+            - Analyst Price Target: {target_price_str}
+            - 52-Week Range: {fifty_two_range}
+            - Business Overview: {summary}
+
+            MANDATORY INSTRUCTIONS:
+            - You MUST tailor all analysis specifically to {comp_name} ({sym}). Mention exact product lines, technology, or business units (e.g. for TSM mention wafer foundry/3nm/2nm/CoWoS packaging; for NVDA mention Blackwell/Hopper GPUs/CUDA; for AAPL mention iPhone/Services/M-series chips).
+            - Do NOT use generic placeholder sentences or generic market templates.
 
             Provide:
             1. rating: Exactly one of ("Strong Buy", "Buy Opportunity", "Hold / Watchlist", or "Speculative Upside")
-            2. thesis: A 2-3 sentence company-specific investment thesis detailing exact catalysts, technology, competitive moats, or growth drivers for {comp_name} ({sym}). Do NOT use generic templated filler text.
-            3. bull_case: Array of exactly 3 specific bullet points highlighting real products, revenue drivers, market share, or catalysts for {comp_name}.
-            4. bear_case: Array of exactly 2 specific bullet points detailing actual competitive, macro, regulatory, or margin risks for {comp_name}.
+            2. thesis: A 2-3 sentence company-specific investment thesis detailing exact catalysts, technology, competitive moats, or growth drivers for {comp_name} ({sym}).
+            3. bull_case: Array of exactly 3 specific bullet points highlighting real products, revenue drivers, market share, or catalysts for {comp_name} ({sym}).
+            4. bear_case: Array of exactly 2 specific bullet points detailing actual competitive, macro, regulatory, or margin risks for {comp_name} ({sym}).
 
             Return ONLY valid JSON with keys: "rating", "thesis", "bull_case", "bear_case".
             """
@@ -371,14 +425,16 @@ def get_ticker_ai_deep_dive(ticker: str, conn=None) -> Dict[str, Any]:
                     json_match = re.search(r'\{.*\}', text_content, re.DOTALL)
                     if json_match:
                         ai_data = json.loads(json_match.group(0))
-                        rating = ai_data.get("rating", rating)
-                        thesis = ai_data.get("thesis", thesis)
+                        if ai_data.get("rating"):
+                            rating = ai_data["rating"]
+                        if ai_data.get("thesis"):
+                            thesis = ai_data["thesis"]
                         if isinstance(ai_data.get("bull_case"), list) and len(ai_data["bull_case"]) >= 2:
                             bull_case = ai_data["bull_case"]
                         if isinstance(ai_data.get("bear_case"), list) and len(ai_data["bear_case"]) >= 2:
                             bear_case = ai_data["bear_case"]
             except Exception as e:
-                print(f"[STOCK DEEP DIVE WARNING] Gemini API call fallback for {sym}: {e}")
+                print(f"[STOCK DEEP DIVE WARNING] Gemini API call error for {sym}: {e}")
 
         report_payload = {
             "ticker": sym,
@@ -389,18 +445,22 @@ def get_ticker_ai_deep_dive(ticker: str, conn=None) -> Dict[str, Any]:
             "market_cap": market_cap,
             "sector": sector,
             "industry": industry,
+            "profit_margins": profit_margin_str,
+            "revenue_growth": rev_growth_str,
+            "target_price": target_price_str,
+            "fifty_two_range": fifty_two_range,
             "rating": rating,
             "thesis": thesis,
             "bull_case": bull_case,
             "bear_case": bear_case,
             "articles": [
                 {
-                    "title": f"Recent Market Intelligence & Earnings for {sym}",
+                    "title": f"Recent Market Intelligence & Financial Filings for {sym}",
                     "url": f"https://finance.yahoo.com/quote/{sym}",
                     "domain": "Yahoo Finance"
                 },
                 {
-                    "title": f"Securities Research & Valuation: {sym}",
+                    "title": f"Securities Research & Price Targets: {sym}",
                     "url": f"https://www.google.com/finance/quote/{sym}:NASDAQ",
                     "domain": "Google Finance"
                 }
